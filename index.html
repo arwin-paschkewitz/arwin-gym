@@ -310,9 +310,18 @@ let restAt=null,restTot=1,actx=null;
 const exRest=e=>e.rest!=null?+e.rest:restDur;
 const restOf=(e,s)=>s&&s.rest!=null?+s.rest:exRest(e);
 function startRest(i,j){const e=active.ex[i],v=restOf(e,e.sets[j]);if(!v){restEnd=0;restAt=null;return}restTot=v*1000;restEnd=Date.now()+restTot;restAt=[i,j]}
-function unlockAudio(){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume()}catch(e){}}
-function beep(){try{unlockAudio();[0,.25,.5].forEach(t=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.setValueAtTime(.0001,actx.currentTime+t);g.gain.exponentialRampToValueAtTime(.4,actx.currentTime+t+.02);g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+t+.18);o.connect(g).connect(actx.destination);o.start(actx.currentTime+t);o.stop(actx.currentTime+t+.2)})}catch(e){}}
-function restDone(){restAt=null;if(navigator.vibrate)navigator.vibrate([300,100,300]);beep();toast("Rest over 💪")}
+function unlockAudio(){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state!=="running")actx.resume();if(!actx._u){actx._u=1;const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}}catch(e){}}
+let restSound=LS.get("gym.sound","buzz"),pendSound=false;
+function playTones(kind){unlockAudio();if(!actx)return;const go=()=>{try{const t0=actx.currentTime+.03,m=actx.createDynamicsCompressor?actx.createDynamicsCompressor():null,out=m||actx.destination;if(m)m.connect(actx.destination);
+ if(kind==="beep"){[0,.25,.5].forEach(t=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.setValueAtTime(.0001,t0+t);g.gain.exponentialRampToValueAtTime(.4,t0+t+.02);g.gain.exponentialRampToValueAtTime(.0001,t0+t+.18);o.connect(g).connect(out);o.start(t0+t);o.stop(t0+t+.2)});return}
+ [0,.55,1.1].forEach(t=>{const g=actx.createGain();g.gain.setValueAtTime(0,t0+t);g.gain.linearRampToValueAtTime(.9,t0+t+.01);g.gain.setValueAtTime(.9,t0+t+.33);g.gain.linearRampToValueAtTime(0,t0+t+.35);g.connect(out);
+  [["sawtooth",180],["square",183]].forEach(([ty,f])=>{const o=actx.createOscillator();o.type=ty;o.frequency.value=f;const og=actx.createGain();og.gain.value=.5;o.connect(og).connect(g);o.start(t0+t);o.stop(t0+t+.36)})})}catch(e){}};
+ if(actx.state!=="running")actx.resume().then(go,go);else go()}
+function beep(){if(restSound==="off")return;playTones(restSound==="beep"?"beep":"buzz")}
+function restDone(){restAt=null;if(navigator.vibrate)navigator.vibrate([350,150,350,150,350]);if(document.hidden)pendSound=true;else beep();toast("Rest over 💪")}
+document.addEventListener("pointerdown",unlockAudio,{capture:true,passive:true});document.addEventListener("touchend",unlockAudio,{capture:true,passive:true});
+document.addEventListener("visibilitychange",()=>{if(document.hidden)return;unlockAudio();if(pendSound){pendSound=false;beep()}});
+setInterval(()=>{if(actx&&actx.state==="suspended"&&restEnd&&!document.hidden)actx.resume().catch(()=>{})},2000);
 function restPicker(i,j){const e=active.ex[i],s0=e.sets[j];let v=restOf(e,s0);
  const sh=openSheet("Rest timer · "+exName(e.exId)+" set "+(j+1),`<div class="rpv" id="rpv"></div><div class="row"><button class="ghost" id="rpm">−15s</button><button class="ghost" id="rpp">+15s</button></div>
  <div class="tg">${[30,60,90,120,150,180,300].map(x=>`<button class="sm" data-pv="${x}">${fmtT(x*1000)}</button>`).join("")}<button class="d" data-pv="0">Off</button></div>
@@ -519,6 +528,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
  <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
+ <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><div class="mu" style="margin-top:8px">iPhone: sound won't play if the ring/silent switch is on silent.</div></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
  chart("c0",{type:"bar",data:{labels,datasets:[{label:"Workouts",data:wk.map(w=>inW(w).length),backgroundColor:"#2f8cff"}]}});
@@ -527,6 +537,8 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  chart("c3",{type:"line",data:{labels,datasets:[{label:"Arm",data:wk.map(w=>avg(w,"armPain")),borderColor:"#ffb84f",spanGaps:true},{label:"Knee",data:wk.map(w=>avg(w,"kneePain")),borderColor:"#ff453a",spanGaps:true}]},options:{scales:{y:{min:0,max:10,ticks:{color:"#8e8e93"}},x:{ticks:{color:"#8e8e93"}}}}});
  chart("c4",{type:"line",data:{labels,datasets:rehab.map((x,i)=>({label:x.name.replace("Arm Rehab ",""),borderColor:COLORS[i%6],spanGaps:true,data:wk.map(w=>{const m=Math.max(0,...inW(w).flatMap(s=>s.ex.filter(e=>e.exId===x.id).flatMap(e=>e.sets.map(t=>t.w||0))));return m||null})}))}});
  $("#exJ").onclick=async()=>{let photos=[];try{photos=await allPhotos()}catch(e){}download("gym-log-"+iso(new Date())+".json",JSON.stringify({app:"gym-log",version:3,sessions,weights,lib,tpl,photos},null,2),"application/json")};
+ document.querySelectorAll("#sndSeg [data-snd]").forEach(b=>b.onclick=()=>{restSound=b.dataset.snd;LS.set("gym.sound",restSound);document.querySelectorAll("#sndSeg [data-snd]").forEach(x=>x.classList.toggle("on",x===b))});
+ $("#sndTest").onclick=()=>{unlockAudio();playTones(restSound==="beep"?"beep":"buzz")};
  $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
  $("#imJ").onclick=()=>$("#imF").click();
  $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;if(Array.isArray(d.photos))for(const p of d.photos)await putPhoto(p);migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
