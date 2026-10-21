@@ -333,12 +333,24 @@ function restPicker(i,j){const e=active.ex[i],s0=e.sets[j];let v=restOf(e,s0);
   if(restAt&&restAt[0]===i&&restAt[1]===j&&restEnd){restTot=v*1000;restEnd=v?Date.now()+restTot:0}
   saveActive();sh.remove();renderActive()}}
 function finishWorkout(){const a=active;
- const ex=a.ex.map(e=>{const x=exById(e.exId)||{};return{exId:e.exId,name:x.name||e.name||e.exId,rehab:!!x.rehab,group:a.group,sets:e.sets.filter(s=>s.done||s.w!==""||s.r!=="").map(s=>({w:s.w===""||s.w==null?null:+s.w,r:s.r===""||s.r==null?null:+s.r}))}}).filter(e=>e.sets.length);
+ const ex=a.ex.map(e=>{const x=exById(e.exId)||{};return{exId:e.exId,name:x.name||e.name||e.exId,rehab:!!x.rehab,group:a.group,sets:e.sets.filter(s=>s.done||s.w!==""||s.r!=="").map(s=>({w:s.w===""||s.w==null?null:+s.w,r:s.r===""||s.r==null?null:+s.r,done:!!s.done,...(s.type?{type:s.type}:{})}))}}).filter(e=>e.sets.length);
  if(!ex.length&&!confirm("No sets logged. Save anyway?"))return;
  const old=a.id?sessions.find(s=>s.id===a.id):null;
  const s={id:a.id||uid(),date:a.date,dow:parse(a.date).getDay(),day:a.name,group:a.group,week:weekOf(a.date),ex,armPain:a.armPain,kneePain:a.kneePain,notes:a.notes,saved:new Date().toISOString(),dur:old?old.dur:Date.now()-a.start};
  if(old)sessions=sessions.map(x=>x.id===s.id?s:x);else sessions.push(s);
- save();active=null;saveActive();restEnd=0;$("#aw").classList.add("hid");toast(old?"Saved ✓":"Workout complete 💪");show("history")}
+ save();active=null;saveActive();restEnd=0;$("#aw").classList.add("hid");toast(old?"Saved ✓":"Workout complete 💪");show("history");if(LS.get("gym.askCoach",true))askCoach(s)}
+
+// ---- Send to Coach ----
+const COACH="arwin-gym@mail.grokbot.com";
+function coachText(s,onlyDone){const L=[`Date: ${DAYS[s.dow]} ${dmy(s.date)}`,`Duration: ${s.dur?fmtT(s.dur):"–"}`,`Total volume: ${Math.round(vol(s)).toLocaleString()} kg`,...(onlyDone?["(completed sets only)"]:[]),""];
+ s.ex.forEach(e=>{const st=e.sets.map((t,i)=>[t,i]).filter(([t])=>!onlyDone||t.done!==false);if(onlyDone&&!st.length)return;L.push(exName(e.exId,e.name));
+  st.forEach(([t,i])=>L.push(`  ${i+1}. ${t.type||"Normal"} ${t.w??"–"} kg x ${t.r??"–"} ${t.done===false?"[not ticked]":t.done?"[ticked]":"[logged]"}`))});
+ L.push("",`Arm pain: ${s.armPain}/10`,`Knee pain: ${s.kneePain}/10`,`Notes: ${s.notes||"–"}`);return L.join("\n")}
+function coachURL(s){const sub=`Workout: ${s.day} ${dmy(s.date)}`,mk=b=>`mailto:${COACH}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(b)}`;let u=mk(coachText(s,false));
+ if(u.length>1800){u=mk(coachText(s,true));if(u.length>1800){let b=coachText(s,true);while(b.length&&mk(b+"\n…").length>1800)b=b.slice(0,-20);u=mk(b+"\n…")}}return u}
+function sendCoach(s){location.href=coachURL(s)}
+function askCoach(s){const sh=openSheet("Send to Coach?",`<div class="mu" style="margin-bottom:10px">Email this workout to your coach (${COACH}).</div><button class="p w" id="cqY">📧 Send to Coach</button><button class="ghost w" id="cqN">Not now</button>`);
+ sh.querySelector("#cqY").onclick=()=>{sendCoach(s);sh.remove()};sh.querySelector("#cqN").onclick=()=>sh.remove()}
 
 // ---- History ----
 function renderHistory(){
@@ -347,7 +359,8 @@ function renderHistory(){
  $("#v-history").innerHTML=`<div class="mu">${list.length} workouts</div>`+list.map(s=>`<div class="card"><div class="rowb"><b>${esc(s.day)}</b><span class="mu">${DAYS[s.dow]} ${dmy(s.date)}</span></div>
  <div class="mu">${s.dur?"⏱ "+fmtT(s.dur)+" · ":""}🏋️ ${Math.round(vol(s)).toLocaleString()} kg · Arm ${s.armPain}/10 · Knee ${s.kneePain}/10</div>
  <table style="margin-top:6px"><tr><th>Exercise</th><th>Best set</th></tr>${s.ex.map(e=>{const b=[...e.sets].sort((x,y)=>(y.w||0)*(y.r||0)-(x.w||0)*(x.r||0)||(y.r||0)-(x.r||0))[0]||{};return`<tr><td>${e.sets.length} × ${esc(exName(e.exId,e.name))}</td><td>${b.w??"–"} kg × ${b.r??"–"}</td></tr>`}).join("")}</table>
- ${s.notes?`<div class="mu">📝 ${esc(s.notes)}</div>`:""}<div class="row" style="margin-top:8px"><button class="ghost" data-e="${s.id}">✏️ Edit</button><button class="d" data-x="${s.id}">🗑 Delete</button></div></div>`).join("");
+ ${s.notes?`<div class="mu">📝 ${esc(s.notes)}</div>`:""}<div class="row" style="margin-top:8px"><button class="ghost" data-e="${s.id}">✏️ Edit</button><button class="ghost" data-cs="${s.id}">📧 Send to Coach</button><button class="d" data-x="${s.id}">🗑 Delete</button></div></div>`).join("");
+ $("#v-history").querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>sendCoach(sessions.find(x=>x.id===b.dataset.cs)));
  $("#v-history").querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>editSession(b.dataset.e));
  $("#v-history").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{if(confirm("Delete this workout?")){sessions=sessions.filter(s=>s.id!==b.dataset.x);save();renderHistory()}});
 }
@@ -528,7 +541,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
  <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
- <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><div class="mu" style="margin-top:8px">iPhone: sound won't play if the ring/silent switch is on silent.</div></div>
+ <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><div class="mu" style="margin-top:8px">iPhone: sound won't play if the ring/silent switch is on silent.</div></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
  chart("c0",{type:"bar",data:{labels,datasets:[{label:"Workouts",data:wk.map(w=>inW(w).length),backgroundColor:"#2f8cff"}]}});
@@ -538,6 +551,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  chart("c4",{type:"line",data:{labels,datasets:rehab.map((x,i)=>({label:x.name.replace("Arm Rehab ",""),borderColor:COLORS[i%6],spanGaps:true,data:wk.map(w=>{const m=Math.max(0,...inW(w).flatMap(s=>s.ex.filter(e=>e.exId===x.id).flatMap(e=>e.sets.map(t=>t.w||0))));return m||null})}))}});
  $("#exJ").onclick=async()=>{let photos=[];try{photos=await allPhotos()}catch(e){}download("gym-log-"+iso(new Date())+".json",JSON.stringify({app:"gym-log",version:3,sessions,weights,lib,tpl,photos},null,2),"application/json")};
  document.querySelectorAll("#sndSeg [data-snd]").forEach(b=>b.onclick=()=>{restSound=b.dataset.snd;LS.set("gym.sound",restSound);document.querySelectorAll("#sndSeg [data-snd]").forEach(x=>x.classList.toggle("on",x===b))});
+ $("#askC").onchange=e=>LS.set("gym.askCoach",e.target.checked);
  $("#sndTest").onclick=()=>{unlockAudio();playTones(restSound==="beep"?"beep":"buzz")};
  $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
  $("#imJ").onclick=()=>$("#imF").click();
