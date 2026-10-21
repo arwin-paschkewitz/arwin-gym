@@ -68,6 +68,9 @@ input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 .rt{position:relative;min-height:22px;height:22px;padding:0 10px;font-size:13px;background:var(--bg);color:var(--ac);border-radius:11px;font-variant-numeric:tabular-nums}.rl.off .rt{color:var(--mu)}
 .rl.live{height:30px}.rl.live .rt{background:var(--ac);color:#fff;height:26px;font-size:15px}.rl.live::before{height:4px;margin-top:-1px;background:#1d2b3f}
 .rpv{text-align:center;font-size:44px;font-weight:800;margin:10px 0;font-variant-numeric:tabular-nums}
+.rv{position:relative;margin-top:8px;border-radius:12px;overflow:hidden;background:#e9e9eb;aspect-ratio:4/3;cursor:pointer}.rv img,.rv video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.rv .r1{opacity:0;transition:opacity .55s ease-in-out}.rv.end .r1{opacity:1}.rvl{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700;padding:2px 8px;border-radius:8px}
+.rvp{position:absolute;right:10px;bottom:10px;width:52px;height:52px;border-radius:50%;background:var(--ac);color:#fff;font-size:20px;padding:0;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 </style></head><body>
 <div id="lock"><h1>🔒 Gym Log</h1><div class="mu">Enter PIN</div><div id="pinDots"></div><div class="pad" id="pad"></div><div id="pinErr" class="mu"></div></div>
 <header><h1 id="title">Workout</h1><div id="hdrR"></div></header>
@@ -349,7 +352,15 @@ function renderExercises(){$("#hdrR").innerHTML='<button class="sm" id="exNew">+
   $("#exL").innerHTML=gs.map(g=>`<div class="lbl">${esc(g.toUpperCase())}</div>`+l.filter(x=>x.group===g).map(x=>`<div class="li" data-x="${esc(x.id)}" role="button"><div class="ico">${esc(x.name[0])}</div><div><b>${esc(x.name)}</b><div class="mu">${x.pose&&HOW[x.pose]?"ⓘ How-to diagram":"No diagram"}${x.def?"":" · custom"}</div></div><span class="mu">›</span></div>`).join("")).join("")||'<div class="card mu">No matches.</div>';
   $("#exL").querySelectorAll("[data-x]").forEach(r=>r.onclick=()=>exDetail(r.dataset.x))};
  $("#exQ").oninput=e=>{exQ=e.target.value;draw()};draw()}
-function howHTML(x){const d=x.pose&&HOW[x.pose];if(!d)return"";return`<div class="lbl">HOW TO</div><div class="howGrid">${d.f.map((f,i)=>`<figure>${howSVG(d,f[1])}<figcaption><b>${i+1}.</b> ${esc(f[0])}</figcaption></figure>`).join("")}</div><ul class="howCues">${d.c.map(c=>`<li>${esc(c)}</li>`).join("")}</ul>`}
+const REAL=new Set(["arm-rehab-band-bicep-curl", "bird-dog", "calf-raise", "chest-press-machine", "chest-supported-row", "face-pull", "glute-bridge", "goblet-squat", "heel-to-toe-walk", "incline-db-press", "incline-push-up", "inverted-row", "lat-pulldown", "lateral-raise", "leg-curl", "leg-press", "pec-deck-cable-fly", "plank", "romanian-deadlift", "seated-cable-row", "seated-leg-extension", "shoulder-press-machine", "side-plank", "single-leg-stand", "slow-low-step-ups", "weight-shifts"]),VID=new Set([]);
+function realHTML(x){const k=x.pose&&slug(x.pose);if(!k||!REAL.has(k))return"";return`<div class="rv" data-rv="${k}"><img class="r0" loading="lazy" decoding="async" src="img/${k}-a.webp" alt="${esc(x.name)} start position"><img class="r1" loading="lazy" decoding="async" src="img/${k}-b.webp" alt="${esc(x.name)} end position"><video class="hid" muted loop playsinline preload="none"></video><span class="rvl">START</span><button class="rvp" aria-label="Play animation">▶</button></div>`}
+document.addEventListener("click",e=>{const b=e.target.closest(".rvp,.rv");if(!b)return;const r=b.closest(".rv");if(r)rvToggle(r)});
+function rvToggle(r){const k=r.dataset.rv,v=r.querySelector("video"),btn=r.querySelector(".rvp"),l=r.querySelector(".rvl");
+ if(r._on){r._on=false;clearInterval(r._t);v.pause();btn.textContent="▶";btn.setAttribute("aria-label","Play animation");return}
+ r._on=true;btn.textContent="❚❚";btn.setAttribute("aria-label","Pause animation");
+ if(VID.has(k)&&!r._vfail){if(!v.src){v.src="vid/"+k+".mp4";v.onerror=()=>{r._vfail=1;v.classList.add("hid");r._on=false;rvToggle(r)}}v.classList.remove("hid");l.classList.add("hid");v.play().catch(()=>{r._vfail=1;v.classList.add("hid");r._on=false;rvToggle(r)});return}
+ let end=r.classList.contains("end");const step=()=>{if(!r.isConnected)return clearInterval(r._t);end=!end;r.classList.toggle("end",end);l.textContent=end?"END":"START"};step();r._t=setInterval(step,1200)}
+function howHTML(x){const d=x.pose&&HOW[x.pose];if(!d)return"";return`<div class="lbl">HOW TO</div>${realHTML(x)}<div class="howGrid">${d.f.map((f,i)=>`<figure>${howSVG(d,f[1])}<figcaption><b>${i+1}.</b> ${esc(f[0])}</figcaption></figure>`).join("")}</div><ul class="howCues">${d.c.map(c=>`<li>${esc(c)}</li>`).join("")}</ul>`}
 function exDetail(id){const x=exById(id);if(!x)return toast("Exercise no longer in library");
  const hist=[...sessions].filter(s=>s.ex.some(e=>e.exId===id)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
  const sec=(t,v)=>v?`<div class="lbl">${t}</div><div class="card" style="white-space:pre-wrap">${esc(v)}</div>`:"";
