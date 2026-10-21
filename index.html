@@ -37,9 +37,17 @@ nav button{flex:1;background:none;border:0;border-radius:0;min-height:60px;color
 canvas{max-height:260px}
 table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px;border-bottom:1px solid #2a2e38;text-align:left}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ok);color:#000;padding:10px 18px;border-radius:20px;z-index:100;font-weight:600}
+.howBtn{float:right;min-height:34px;padding:4px 10px;font-size:14px;color:var(--ac);border-color:var(--ac)}
+#howModal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:flex;align-items:center;justify-content:center;padding:12px}
+.howBox{background:var(--card);border-radius:var(--r);padding:14px;max-width:720px;width:100%;max-height:90vh;overflow:auto}
+.howGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.howGrid figure{margin:0;background:var(--card2);border-radius:10px;padding:6px}.howGrid svg{width:100%;height:auto;display:block}
+.howGrid figcaption{font-size:13px;color:var(--mu);margin-top:4px}.howCues{margin:12px 0 0;padding-left:20px}.howCues li{margin:4px 0}
+@media(max-width:520px){.howGrid{grid-template-columns:1fr}.howGrid figure{display:grid;grid-template-columns:42% 1fr;gap:8px;align-items:center}}
 </style></head><body>
 <div id="lock"><h1>🔒 Gym Log</h1><div class="mu">Enter PIN</div><div id="pinDots"></div><div class="pad" id="pad"></div><div id="pinErr" class="mu"></div></div>
 <header><h1 id="title">Today</h1><div class="mu" id="sub"></div></header>
+<div id="howModal" class="hid"></div>
 <main>
 <section id="v-today"></section>
 <section id="v-history" class="hid"></section>
@@ -102,7 +110,7 @@ function renderToday(arg){
  if(P.note)h+=`<div class="card mu">ℹ️ ${esc(P.note)}</div>`;
  const prev=existing?existing.ex:null;
  P.ex.forEach((e,i)=>{const pe=prev&&prev.find(x=>x.name===e.name);
-  h+=`<div class="card ${e.rehab?"rehab":""}" data-i="${i}"><b>${esc(e.name)}</b><div class="mu">Target ${e.sets} × ${esc(e.reps)}${e.rehab?" · rehab, keep light":""}</div><div class="sets"><span class="mu">Set</span><span class="mu">Weight kg</span><span class="mu">Reps / sec</span>`;
+  h+=`<div class="card ${e.rehab?"rehab":""}" data-i="${i}">${HOW[e.name]?`<button class="howBtn" data-how="${esc(e.name)}">ⓘ How to</button>`:""}<b>${esc(e.name)}</b><div class="mu">Target ${e.sets} × ${esc(e.reps)}${e.rehab?" · rehab, keep light":""}</div><div class="sets"><span class="mu">Set</span><span class="mu">Weight kg</span><span class="mu">Reps / sec</span>`;
   for(let s=0;s<e.sets;s++){const ps=pe&&pe.sets[s]||{};h+=`<span>${s+1}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="w" value="${ps.w??""}"><input type="number" inputmode="numeric" min="0" class="r" value="${ps.r??""}">`}
   h+=`</div></div>`});
  if(P.ex.length===0)h+=`<div class="card">Rest day 🛌 You can still log a walk or pain scores below.</div>`;
@@ -125,6 +133,102 @@ function saveSession(dow){
  save();toast("Saved ✓");editing=null;show("history");
 }
 const vol=s=>s.ex.reduce((a,e)=>a+e.sets.reduce((b,t)=>b+((t.w||0)*(t.r||0)),0),0);
+
+// ---- How-to diagrams (HOWTO_V1) ----
+const SEAT=[["r",36,70,28,5],["l",42,75,42,100]],BACK=[["r",34,30,5,42]],RAIL=[["l",24,58,24,100],["l",18,58,30,58]];
+const HOW={
+"Lat Pulldown":{p:[...SEAT,["l",30,100,30,4],["l",30,4,62,4],["r",62,60,16,5]],cab:[62,4],t:"bar",c:["Don't yank","Control on the way up","Go light, stop if sharp pain"],f:[
+ ["Start: arms extended, wide grip, slight lean back","45 28 47 40 52 22 58 8 50 70 72 68 74 100"],
+ ["Mid: elbows down & back, bar at chin, chest up","45 28 47 40 40 50 54 30 50 70 72 68 74 100"],
+ ["End: bar at upper chest, blades squeezed down","45 28 47 40 40 56 56 42 50 70 72 68 74 100"]]},
+"Chest Press Machine":{p:[...SEAT,...BACK],t:"grip",c:["Smooth push, don't lock elbows","Keep the arm light"],f:[
+ ["Start: handles at chest","45 28 45 40 36 50 52 42 46 70 68 70 70 100"],["Press forward","45 28 45 40 52 46 64 42 46 70 68 70 70 100"],["End: arms long, slow return","45 28 45 40 62 42 78 42 46 70 68 70 70 100"]]},
+"Incline DB Press":{p:[["l",22,40,48,76],["l",40,76,40,100]],t:"db",c:["Lower slowly","Keep the arm light"],f:[
+ ["Start: dumbbells at chest","26 38 32 48 30 62 38 48 46 74 66 72 70 100"],["Press up","26 38 32 48 40 50 44 36 46 74 66 72 70 100"],["Top: arms over shoulders","26 38 32 48 38 38 44 24 46 74 66 72 70 100"]]},
+"Pec Deck/Cable Fly":{p:[...SEAT,...BACK],t:"grip",c:["Soft bend in elbows","Keep the arm light"],f:[
+ ["Start: arms open wide","45 28 45 40 34 40 26 44 46 70 68 70 70 100"],["Hug forward","45 28 45 40 50 44 58 40 46 70 68 70 70 100"],["Squeeze hands together","45 28 45 40 60 42 74 40 46 70 68 70 70 100"]]},
+"Goblet Squat":{t:"db",c:["Chest up, knees track toes","Pain-free range for the knee"],f:[
+ ["Start: hold weight at chest","60 18 60 30 64 44 66 36 60 60 60 80 60 100"],["Sit back, shallow is fine","56 34 54 46 62 56 66 48 46 72 64 80 60 100"],["Stand tall","60 18 60 30 64 44 66 36 60 60 60 80 60 100"]]},
+"Leg Press":{p:[["l",18,44,40,76],["l",40,76,60,76]],ft:"plate",c:["Don't lock the knees","Pain-free range for the knee"],f:[
+ ["Start: knees bent","20 44 26 56 32 66 40 70 40 74 52 54 64 68"],["Push through heels","20 44 26 56 32 66 40 70 40 74 60 58 76 62"],["End: legs long, soft knees","20 44 26 56 32 66 40 70 40 74 66 64 90 62"]]},
+"Romanian Deadlift":{t:"db",c:["Hinge at hips, flat back","Light weight, slow"],f:[
+ ["Start: stand tall","60 18 60 30 61 46 62 62 60 60 60 80 60 100"],["Push hips back","80 32 72 40 74 54 74 66 54 60 58 80 60 100"],["Stretch hamstrings, then stand","88 44 78 48 78 62 78 76 52 60 58 80 60 100"]]},
+"Leg Curl":{p:[...SEAT,...BACK],ft:"pad",c:["Slow both ways","Pain-free range for the knee"],f:[
+ ["Start: legs out","45 28 45 40 50 54 56 66 46 70 70 70 92 74"],["Curl heels down","45 28 45 40 50 54 56 66 46 70 70 70 84 90"],["End: heels under, slow return","45 28 45 40 50 54 56 66 46 70 70 70 68 96"]]},
+"Calf Raise":{p:RAIL,c:["Pause at the top","Hold support"],f:[
+ ["Start: flat feet","60 18 60 30 46 44 30 58 60 60 60 80 60 100"],["Rise on toes","60 12 60 24 46 40 30 58 60 54 60 74 62 94"],["Lower slowly","60 18 60 30 46 44 30 58 60 60 60 80 60 100"]]},
+"Seated Cable Row":{p:[["r",28,76,26,5],["r",80,72,4,14],["l",100,40,100,100]],cab:[100,60],t:"grip",c:["Chest up, no swinging","Keep the arm light"],f:[
+ ["Start: arms long, slight reach","56 38 50 48 62 54 76 58 40 76 62 70 80 80"],["Pull to belly","44 34 42 46 52 58 62 60 40 76 62 70 80 80"],["End: elbows back, squeeze","42 34 40 46 30 58 50 60 40 76 62 70 80 80"]]},
+"Chest-Supported Row":{p:[["l",40,74,64,42],["l",44,76,44,100]],t:"grip",c:["Chest stays on pad","Keep the arm light"],f:[
+ ["Start: arms hang","68 38 60 46 62 62 64 78 42 72 50 88 44 100"],["Pull elbows back","68 38 60 46 54 60 62 66 42 72 50 88 44 100"],["Squeeze shoulder blades","68 38 60 46 46 54 58 58 42 72 50 88 44 100"]]},
+"Shoulder Press Machine":{p:[...SEAT,...BACK],t:"grip",c:["Press smooth, don't lock out hard","Light, stop if sharp pain"],f:[
+ ["Start: hands at shoulders","45 28 45 40 44 52 48 38 46 70 68 70 70 100"],["Press up","45 28 45 40 44 36 48 22 46 70 68 70 70 100"],["Top: arms long, lower slowly","45 28 45 40 46 26 48 10 46 70 68 70 70 100"]]},
+"Lateral Raise":{front:1,t:"db",c:["Lead with elbows, to shoulder height","Very light for the arm"],f:[
+ ["Start: arms by sides","60 18 52 30 50 45 50 58 55 60 55 80 54 100"],["Raise out to sides","60 18 52 30 42 40 36 48 55 60 55 80 54 100"],["Top: shoulder height, lower slow","60 18 52 30 40 30 28 30 55 60 55 80 54 100"]]},
+"Face Pull":{p:[["l",100,10,100,100]],cab:[100,30],t:"grip",c:["Pull to face, elbows high","Light band or cable"],f:[
+ ["Start: arms forward","60 18 60 30 72 32 86 30 60 60 60 80 60 100"],["Pull toward face","60 18 60 30 66 30 76 26 60 60 60 80 60 100"],["End: hands by ears","60 18 60 30 52 28 64 20 60 60 60 80 60 100"]]},
+"Plank":{c:["Straight line head to heels","Breathe, don't sag"],f:[
+ ["Set up on forearms & knees","92 84 80 88 80 100 96 100 56 94 40 100 22 100"],["Lift: straight body line","92 82 82 86 82 100 96 100 56 90 38 94 20 98"],["Hold, squeeze glutes","92 82 82 86 82 100 96 100 56 90 38 94 20 98"]]},
+"Side Plank":{c:["Hips high, body straight","Knees down to make it easier"],f:[
+ ["Set up on forearm, knees bent","92 80 80 86 80 100 96 100 56 92 40 100 30 96"],["Lift hips","92 76 82 82 82 100 96 100 56 86 38 92 20 98"],["Hold, top arm up","92 76 82 82 82 100 96 100 56 86 38 92 20 98 e2=84,70 w2=86,58"]]},
+"Incline Push-up":{p:[["r",76,74,20,26]],c:["Body straight","Keep the arm light, stop if sharp pain"],f:[
+ ["Start: hands on bench, arms long","86 52 76 58 78 66 80 74 48 80 34 90 20 100"],["Lower chest to bench","84 60 74 64 66 72 80 74 46 82 32 91 20 100"],["Press back up","86 52 76 58 78 66 80 74 48 80 34 90 20 100"]]},
+"Inverted Row":{p:[["l",40,50,80,50],["l",40,50,40,100],["l",80,50,80,100]],c:["Body straight, feet on floor","Go light, stop if sharp pain"],f:[
+ ["Start: hang, arms long","42 78 52 78 55 64 58 52 74 86 88 93 100 100"],["Pull chest up","43 66 53 68 64 66 60 52 75 79 89 90 100 100"],["Top: chest to bar, slow down","44 56 54 58 70 64 60 52 76 72 90 86 100 100"]]},
+"Glute Bridge":{c:["Squeeze glutes at top","Pain-free range for the knee"],f:[
+ ["Start: lie, knees bent","20 92 30 94 40 98 52 98 56 96 72 80 80 98"],["Lift hips","21 92 32 94 42 98 54 98 56 88 73 79 80 98"],["Top: straight line, slow down","22 92 34 92 44 98 56 98 58 80 74 78 80 98"]]},
+"Dead Bug":{c:["Low back pressed down","Slow, breathe out"],f:[
+ ["Start: arms up, knees at 90°","20 92 30 94 32 80 32 66 56 96 56 78 72 78"],["Reach opposite arm & leg","20 92 30 94 22 84 10 82 56 96 70 92 88 94 e2=34,80 w2=34,66 k2=56,78 a2=72,78"],["Return and switch sides","20 92 30 94 32 80 32 66 56 96 56 78 72 78"]]},
+"Bird Dog":{c:["Hips level, slow","Pain-free range for the knee"],f:[
+ ["Start: hands & knees","90 74 80 80 80 90 80 100 48 80 48 100 28 100"],["Reach arm forward, leg back","90 72 80 80 92 76 104 72 48 80 32 80 16 78 e2=80,90 w2=80,100 k2=48,100 a2=28,100"],["Return and switch sides","90 74 80 80 80 90 80 100 48 80 48 100 28 100"]]},
+"Weight Shifts":{front:1,p:RAIL,c:["Small, slow shifts","Hold support"],f:[
+ ["Start: feet hip width","60 18 52 30 42 42 28 58 55 60 55 80 52 100 k2=65,80 a2=68,100"],["Shift weight to one leg","64 18 56 30 44 42 28 58 59 60 54 80 52 100 k2=66,80 a2=68,100 c=64"],["Shift to the other leg","56 18 48 30 38 42 28 58 51 60 52 80 52 100 k2=62,80 a2=68,100 c=56"]]},
+"Single-Leg Stand":{front:1,p:RAIL,c:["Start on your good leg","Hold support"],f:[
+ ["Start: both feet, hand on rail","60 18 52 30 40 44 26 58 55 60 55 80 54 100 k2=65,80 a2=66,100"],["Lift one foot slightly","60 18 52 30 40 44 26 58 55 60 55 80 56 100 k2=66,76 a2=66,90"],["Hold 20–30 s, then switch","60 18 52 30 40 44 26 58 55 60 55 80 56 100 k2=68,74 a2=68,88"]]},
+"Heel-to-Toe Walk":{p:[["l",10,58,110,58]],c:["Look ahead, slow steps","Hold support, wall nearby"],f:[
+ ["Start: stand tall","56 18 56 30 50 44 46 58 56 60 56 80 56 100 k2=58,80 a2=58,100"],["Step: heel to toe","58 18 58 30 52 44 48 58 58 60 62 80 68 100 k2=56,80 a2=54,100"],["Repeat in a straight line","60 18 60 30 54 44 50 58 60 60 64 80 68 100 k2=66,80 a2=80,100"]]},
+"Slow Low Step-ups":{p:[["r",62,90,30,10],...RAIL],c:["Low step, slow","Hold support · pain-free knee"],f:[
+ ["Start: one foot on step","58 18 58 30 42 42 26 58 58 60 70 76 72 90 k2=58,80 a2=58,100"],["Step up slowly","66 12 66 24 46 38 26 56 66 54 70 72 72 90 k2=64,72 a2=62,88"],["Stand on step, step down slow","72 8 72 20 50 34 26 56 72 50 72 70 72 90 k2=76,70 a2=78,90"]]},
+"Seated Leg Extension":{p:[...SEAT,...BACK],c:["No weight, slow","Pain-free range for the knee"],f:[
+ ["Start: knees bent","45 28 45 40 50 54 56 66 46 70 70 70 72 98"],["Straighten leg","45 28 45 40 50 54 56 66 46 70 70 70 88 84"],["Hold 2 s, lower slow","45 28 45 40 50 54 56 66 46 70 70 70 94 72"]]},
+"Arm Rehab Band Bicep Curl":{band:[64,100],t:"grip",c:["Elbow pinned to side","Go light, stop if sharp pain"],f:[
+ ["Start: arm down","60 18 60 30 60 45 62 60 60 60 60 80 60 100"],["Curl up","60 18 60 30 60 45 70 46 60 60 60 80 60 100"],["Top: squeeze, lower slowly","60 18 60 30 60 45 64 34 60 60 60 80 60 100"]]},
+"Arm Rehab Band Tricep Pushdown":{band:[92,8],p:[["l",92,4,92,100]],t:"grip",c:["Elbow stays at side","Go light, stop if sharp pain"],f:[
+ ["Start: hands at chest","60 18 60 30 60 46 70 36 60 60 60 80 60 100"],["Push down","60 18 60 30 60 46 72 48 60 60 60 80 60 100"],["End: arm straight, slow up","60 18 60 30 60 46 64 60 60 60 60 80 60 100"]]},
+"Arm Rehab Wrist Curl (1-2kg)":{p:SEAT,t:"db",c:["Forearm rests on thigh","Go light, stop if sharp pain"],f:[
+ ["Start: wrist bent down, palm up","45 28 46 40 56 68 72 66 46 70 72 68 72 100 n=76,74"],["Curl wrist up","45 28 46 40 56 68 72 66 46 70 72 68 72 100 n=79,66"],["Top: hold, lower slowly","45 28 46 40 56 68 72 66 46 70 72 68 72 100 n=76,58"]]},
+"Arm Rehab Reverse Wrist Curl":{p:SEAT,t:"db",c:["Palm down, forearm on thigh","Go light, stop if sharp pain"],f:[
+ ["Start: knuckles down","45 28 46 40 56 68 72 66 46 70 72 68 72 100 n=76,74"],["Lift back of hand","45 28 46 40 56 68 72 66 46 70 72 68 72 100 n=79,66"],["Top: hold, lower slowly","45 28 46 40 56 68 72 66 46 70 72 68 72 100 n=76,58"]]}
+};
+function poseOf(s){const [m,...kv]=s.split(/ (?=[a-z]\d?=)/),n=m.split(" ").map(Number),P={h:[n[0],n[1]],s:[n[2],n[3]],e:[n[4],n[5]],w:[n[6],n[7]],p:[n[8],n[9]],k:[n[10],n[11]],a:[n[12],n[13]]};
+ kv.forEach(t=>{const [k,v]=t.split("=");P[k]=k==="c"?+v:v.split(",").map(Number)});return P}
+function howSVG(d,str){const P=poseOf(str),L=(a,b,c,w)=>`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`,
+ TX="var(--tx)",MU="var(--mu)",AC="var(--ac)";let g=`<line x1="4" y1="101" x2="116" y2="101" stroke="#333" stroke-width="1.5"/>`;
+ (d.p||[]).forEach(q=>g+=q[0]==="r"?`<rect x="${q[1]}" y="${q[2]}" width="${q[3]}" height="${q[4]}" rx="1.5" fill="var(--card2)" stroke="${MU}" stroke-width="1.5"/>`:L([q[1],q[2]],[q[3],q[4]],MU,2.5));
+ const hand=P.n||P.w,M=(p,c)=>[2*c-p[0],p[1]],c=P.c||60;
+ if(d.cab)g+=L(d.cab,P.w,AC,1.2)+`<circle cx="${d.cab[0]}" cy="${d.cab[1]}" r="2.5" fill="none" stroke="${MU}" stroke-width="1.5"/>`;
+ if(d.band)g+=`<path d="M${d.band[0]} ${d.band[1]} L${P.w[0]} ${P.w[1]}" stroke="${AC}" stroke-width="1.5" stroke-dasharray="3 2"/>`;
+ const limbs=(s,e,w,p,k,a,o)=>L(s,e,TX,3*o)+L(e,w,TX,3*o)+L(p,k,TX,3.4*o)+L(k,a,TX,3.4*o);
+ if(d.front){const sL=M(P.s,c),pL=M(P.p,c);g+=L(P.s,sL,TX,3)+L([c,P.s[1]],[c,P.p[1]],TX,3.6)+L(P.p,pL,TX,3)+L([c,P.s[1]],P.h,TX,3)+
+  limbs(P.s,P.e,P.w,P.p,P.k,P.a,1)+limbs(sL,P.e2||M(P.e,c),P.w2||M(P.w,c),pL,P.k2||M(P.k,c),P.a2||M(P.a,c),1);
+  if(d.t==="db")[P.w,P.w2||M(P.w,c)].forEach(q=>g+=`<rect x="${q[0]-4}" y="${q[1]-2}" width="8" height="4" rx="1" fill="${AC}"/>`)}
+ else{if(P.k2)g+=L(P.p,P.k2,TX,2.4)+L(P.k2,P.a2,TX,2.4);if(P.e2)g+=L(P.s,P.e2,TX,2.2)+L(P.e2,P.w2,TX,2.2);
+  g+=L(P.s,P.p,TX,3.6)+limbs(P.s,P.e,P.w,P.p,P.k,P.a,1);if(P.n)g+=L(P.w,P.n,TX,2.5);
+  if(d.t==="bar")g+=L([hand[0]-16,hand[1]],[hand[0]+14,hand[1]],AC,3);
+  if(d.t==="db")g+=`<rect x="${hand[0]-3.5}" y="${hand[1]-3.5}" width="7" height="7" rx="1.5" fill="${AC}"/>`;
+  if(d.t==="grip")g+=`<circle cx="${hand[0]}" cy="${hand[1]}" r="2.6" fill="${AC}"/>`}
+ if(d.ft==="plate")g+=L([P.a[0]+3,P.a[1]-14],[P.a[0]+3,P.a[1]+12],AC,3);
+ if(d.ft==="pad")g+=`<circle cx="${P.a[0]}" cy="${P.a[1]}" r="3.5" fill="${AC}"/>`;
+ g+=`<circle cx="${P.h[0]}" cy="${P.h[1]}" r="6.5" fill="var(--bg)" stroke="${TX}" stroke-width="3"/>`;
+ return `<svg viewBox="0 0 120 106" role="img">${g}</svg>`}
+function openHow(name){const d=HOW[name];if(!d)return;const m=$("#howModal");
+ m.innerHTML=`<div class="howBox" role="dialog" aria-label="How to ${esc(name)}"><div class="row" style="align-items:flex-start"><h2 style="margin:0">${esc(name)}</h2><button id="howX" aria-label="Close" style="flex:0 0 auto">✕</button></div>
+ <div class="howGrid">${d.f.map((f,i)=>`<figure>${howSVG(d,f[1])}<figcaption><b>${i+1}.</b> ${esc(f[0])}</figcaption></figure>`).join("")}</div>
+ <ul class="howCues">${d.c.map(c=>`<li>${esc(c)}</li>`).join("")}</ul></div>`;
+ m.classList.remove("hid");$("#howX").onclick=closeHow}
+function closeHow(){$("#howModal").classList.add("hid")}
+document.addEventListener("click",e=>{const b=e.target.closest(".howBtn");if(b)openHow(b.dataset.how);else if(e.target.id==="howModal")closeHow()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeHow()});
 
 // ---- History ----
 function renderHistory(){
