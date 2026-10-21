@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gym Log">
+<title>Arwin's Gym Log</title>
+<link rel="manifest" id="mf">
+<link rel="apple-touch-icon" id="ati">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0f1115;--card:#1a1d24;--card2:#22262f;--tx:#e8eaf0;--mu:#8b93a7;--ac:#4f9cff;--ok:#3ecf8e;--bad:#ff5d5d;--r:14px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) 0 calc(76px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;background:var(--bg);padding:12px 16px;z-index:5;border-bottom:1px solid #222}
+h1{font-size:20px;margin:0}h2{font-size:18px;margin:18px 0 8px}.mu{color:var(--mu);font-size:14px}
+main{padding:12px 16px;max-width:720px;margin:auto}
+.card{background:var(--card);border-radius:var(--r);padding:14px;margin:10px 0}
+.rehab{border-left:4px solid var(--ok)}
+button,select,input,textarea{font:inherit;color:var(--tx);background:var(--card2);border:1px solid #333;border-radius:10px;min-height:44px;padding:8px 12px}
+button{cursor:pointer}button.p{background:var(--ac);border:0;font-weight:600}button.d{background:var(--bad);border:0}
+button.w{width:100%;margin-top:10px}
+input[type=number]{width:100%;text-align:center}
+.sets{display:grid;grid-template-columns:40px 1fr 1fr;gap:6px;align-items:center;margin-top:8px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}
+input[type=range]{width:100%;min-height:36px;padding:0;accent-color:var(--ac)}
+textarea{width:100%;min-height:80px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#151820;border-top:1px solid #262a33;padding-bottom:env(safe-area-inset-bottom);z-index:9}
+nav button{flex:1;background:none;border:0;border-radius:0;min-height:60px;color:var(--mu)}nav button.on{color:var(--ac);font-weight:700}
+.hid{display:none!important}
+#lock{position:fixed;inset:0;background:var(--bg);z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+#pinDots{font-size:32px;letter-spacing:12px;min-height:40px}
+.pad{display:grid;grid-template-columns:repeat(3,80px);gap:12px}.pad button{height:72px;font-size:26px;border-radius:50%}
+canvas{max-height:260px}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px;border-bottom:1px solid #2a2e38;text-align:left}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ok);color:#000;padding:10px 18px;border-radius:20px;z-index:100;font-weight:600}
+</style></head><body>
+<div id="lock"><h1>🔒 Gym Log</h1><div class="mu">Enter PIN</div><div id="pinDots"></div><div class="pad" id="pad"></div><div id="pinErr" class="mu"></div></div>
+<header><h1 id="title">Today</h1><div class="mu" id="sub"></div></header>
+<main>
+<section id="v-today"></section>
+<section id="v-history" class="hid"></section>
+<section id="v-progress" class="hid"></section>
+<section id="v-settings" class="hid"></section>
+</main>
+<nav><button data-v="today" class="on">🏋️<br>Today</button><button data-v="history">📋<br>History</button><button data-v="progress">📈<br>Progress</button><button data-v="settings">⚙️<br>Settings</button></nav>
+<script>
+"use strict";
+// PIN is stored only as SHA-256 hash. Privacy lock only - not real security.
+const DEFAULT_PIN_HASH="1d27ca12704e713bb23a54ae2f77a3850bb74d34afd943fd2483a57a05d725cb";
+const START=new Date(2026,9,26);const WEEKS=12;const START_WEIGHT=105.3;
+const E=(name,sets,reps,o={})=>Object.assign({name,sets,reps},o);
+const PROGRAM={
+1:{name:"Chest",group:"Chest",ex:[E("Chest Press Machine",3,"10"),E("Incline DB Press",3,"10"),E("Pec Deck/Cable Fly",3,"12"),E("Arm Rehab Band Tricep Pushdown",2,"15",{rehab:1}),E("Arm Rehab Wrist Curl (1-2kg)",2,"15",{rehab:1})]},
+2:{name:"Legs",group:"Legs",note:"Knee: go shallow, keep it pain-free.",ex:[E("Goblet Squat",3,"10"),E("Leg Press",3,"10"),E("Romanian Deadlift",3,"10"),E("Leg Curl",3,"12"),E("Calf Raise",3,"15")]},
+3:{name:"Rest",group:"Rest",note:"30 min walk.",ex:[]},
+4:{name:"Back",group:"Back",ex:[E("Lat Pulldown",3,"10"),E("Seated Cable Row",3,"10"),E("Chest-Supported Row",3,"10"),E("Arm Rehab Band Bicep Curl",2,"15",{rehab:1}),E("Arm Rehab Reverse Wrist Curl",2,"15",{rehab:1})]},
+5:{name:"Shoulders & Core",group:"Shoulders/Core",ex:[E("Shoulder Press Machine",3,"10"),E("Lateral Raise",3,"12"),E("Face Pull",3,"12"),E("Plank",3,"30s"),E("Arm Rehab Band Bicep Curl",2,"15",{rehab:1}),E("Arm Rehab Band Tricep Pushdown",2,"15",{rehab:1})]},
+6:{name:"Calisthenics & Balance",group:"Calisthenics/Balance",note:"Protect the knee. Use a rail for balance work.",ex:[E("Incline Push-up",3,"10"),E("Inverted Row",3,"8"),E("Glute Bridge",3,"12"),E("Dead Bug",3,"10/side"),E("Bird Dog",3,"10/side"),E("Side Plank",3,"20s/side"),E("Weight Shifts",2,"10"),E("Single-Leg Stand",3,"20-30s/leg"),E("Heel-to-Toe Walk",3,"10 steps"),E("Slow Low Step-ups",2,"8/leg"),E("Seated Leg Extension",2,"12")]},
+0:{name:"Rest",group:"Rest",note:"Full rest day.",ex:[]}};
+const DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
+let sessions=LS.get("gym.sessions",[]),weights=LS.get("gym.weights",[]);
+const save=()=>{LS.set("gym.sessions",sessions);LS.set("gym.weights",weights)};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const parse=s=>{const[a,b,c]=s.split("-").map(Number);return new Date(a,b-1,c)};
+const weekOf=s=>{const w=Math.floor((parse(s)-START)/(7*864e5))+1;return w};
+const wkLabel=w=>w<1?"Pre-program":w>WEEKS?"Week "+w+" (past plan)":"Week "+w+" of "+WEEKS;
+function toast(m){const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),1800)}
+async function sha(s){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+const pinHash=()=>localStorage.getItem("gym.pinHash")||DEFAULT_PIN_HASH;
+
+// ---- Lock ----
+let pinBuf="";
+function buildPad(){const p=$("#pad");["1","2","3","4","5","6","7","8","9","⌫","0","✓"].forEach(k=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>pinKey(k);p.appendChild(b)})}
+async function pinKey(k){if(k==="⌫")pinBuf=pinBuf.slice(0,-1);else if(k==="✓")return tryPin();else if(pinBuf.length<8)pinBuf+=k;$("#pinDots").textContent="•".repeat(pinBuf.length);if(pinBuf.length===4)tryPin()}
+async function tryPin(){if((await sha(pinBuf))===pinHash()){$("#lock").classList.add("hid");sessionStorage.setItem("gym.unlocked","1");$("#pinErr").textContent=""}else{$("#pinErr").textContent="Wrong PIN"}pinBuf="";$("#pinDots").textContent=""}
+document.addEventListener("keydown",e=>{if($("#lock").classList.contains("hid"))return;if(/^\d$/.test(e.key))pinKey(e.key);else if(e.key==="Backspace")pinKey("⌫");else if(e.key==="Enter")pinKey("✓")});
+
+// ---- Nav ----
+let view="today";
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.v));
+function show(v,arg){view=v;document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+["today","history","progress","settings"].forEach(x=>$("#v-"+x).classList.toggle("hid",x!==v));
+$("#title").textContent={today:"Today",history:"History",progress:"Progress",settings:"Settings"}[v];$("#sub").textContent="";
+({today:renderToday,history:renderHistory,progress:renderProgress,settings:renderSettings})[v](arg);window.scrollTo(0,0)}
+
+// ---- Today / editor ----
+let editing=null;
+function renderToday(arg){
+ let date,dow,existing=null;
+ if(arg&&arg.id){existing=sessions.find(s=>s.id===arg.id);date=existing.date;dow=existing.dow}
+ else{date=(arg&&arg.date)||iso(new Date());dow=(arg&&arg.dow!=null)?arg.dow:parse(date).getDay()}
+ editing=existing;const P=PROGRAM[dow];
+ $("#sub").textContent=wkLabel(weekOf(date))+" · "+DAYS[dow]+" "+P.name;
+ let h=`<div class="card"><div class="row"><label>Date<br><input type="date" id="tDate" value="${date}"></label><label>Workout<br><select id="tDow">${[1,2,3,4,5,6,3,0].filter((v,i,a)=>a.indexOf(v)===i).map(d=>`<option value="${d}" ${d==dow?"selected":""}>${DAYS[d]} – ${PROGRAM[d].name}</option>`).join("")}</select></label></div>${editing?'<div class="mu" style="margin-top:8px">Editing saved session</div>':""}</div>`;
+ if(P.note)h+=`<div class="card mu">ℹ️ ${esc(P.note)}</div>`;
+ const prev=existing?existing.ex:null;
+ P.ex.forEach((e,i)=>{const pe=prev&&prev.find(x=>x.name===e.name);
+  h+=`<div class="card ${e.rehab?"rehab":""}" data-i="${i}"><b>${esc(e.name)}</b><div class="mu">Target ${e.sets} × ${esc(e.reps)}${e.rehab?" · rehab, keep light":""}</div><div class="sets"><span class="mu">Set</span><span class="mu">Weight kg</span><span class="mu">Reps / sec</span>`;
+  for(let s=0;s<e.sets;s++){const ps=pe&&pe.sets[s]||{};h+=`<span>${s+1}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="w" value="${ps.w??""}"><input type="number" inputmode="numeric" min="0" class="r" value="${ps.r??""}">`}
+  h+=`</div></div>`});
+ if(P.ex.length===0)h+=`<div class="card">Rest day 🛌 You can still log a walk or pain scores below.</div>`;
+ const ap=existing?existing.armPain:0,kp=existing?existing.kneePain:0;
+ h+=`<div class="card"><label>Arm pain: <b id="apv">${ap}</b>/10<input type="range" min="0" max="10" id="ap" value="${ap}"></label><label>Knee pain: <b id="kpv">${kp}</b>/10<input type="range" min="0" max="10" id="kp" value="${kp}"></label><label>Session notes<textarea id="notes">${esc(existing?existing.notes:"")}</textarea></label>
+ <button class="p w" id="saveBtn">💾 Save session</button>${editing?'<button class="w" id="cancelBtn">Cancel edit</button>':""}</div>`;
+ $("#v-today").innerHTML=h;
+ $("#ap").oninput=e=>$("#apv").textContent=e.target.value;$("#kp").oninput=e=>$("#kpv").textContent=e.target.value;
+ $("#tDow").onchange=e=>renderToday({date:$("#tDate").value,dow:+e.target.value,id:undefined});
+ $("#tDate").onchange=e=>{if(!editing)renderToday({date:e.target.value})};
+ $("#saveBtn").onclick=()=>saveSession(dow);
+ if(editing)$("#cancelBtn").onclick=()=>show("history");
+}
+function saveSession(dow){
+ const P=PROGRAM[dow],date=$("#tDate").value||iso(new Date());
+ const ex=P.ex.map((e,i)=>{const c=document.querySelector(`.card[data-i="${i}"]`);const ws=c.querySelectorAll("input.w"),rs=c.querySelectorAll("input.r");
+  const sets=[...ws].map((w,s)=>({w:w.value===""?null:+w.value,r:rs[s].value===""?null:+rs[s].value}));return{name:e.name,rehab:!!e.rehab,group:P.group,sets}});
+ const s={id:editing?editing.id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),date,dow,day:P.name,group:P.group,week:weekOf(date),ex,armPain:+$("#ap").value,kneePain:+$("#kp").value,notes:$("#notes").value,saved:new Date().toISOString()};
+ if(editing)sessions=sessions.map(x=>x.id===s.id?s:x);else sessions.push(s);
+ save();toast("Saved ✓");editing=null;show("history");
+}
+const vol=s=>s.ex.reduce((a,e)=>a+e.sets.reduce((b,t)=>b+((t.w||0)*(t.r||0)),0),0);
+
+// ---- History ----
+function renderHistory(){
+ const list=[...sessions].sort((a,b)=>b.date.localeCompare(a.date)||b.saved.localeCompare(a.saved));
+ $("#sub").textContent=list.length+" sessions";
+ if(!list.length){$("#v-history").innerHTML='<div class="card mu">No sessions yet. Log one from Today.</div>';return}
+ $("#v-history").innerHTML=list.map(s=>`<div class="card"><div class="row"><div><b>${DAYS[s.dow]} ${s.date.split("-").reverse().join("/")}</b> · ${esc(s.day)}<div class="mu">${wkLabel(s.week)} · Vol ${Math.round(vol(s)).toLocaleString()} kg · Arm ${s.armPain}/10 · Knee ${s.kneePain}/10</div>${s.notes?`<div class="mu">📝 ${esc(s.notes)}</div>`:""}</div></div><div class="row" style="margin-top:8px"><button data-e="${s.id}">✏️ Edit</button><button class="d" data-x="${s.id}">🗑 Delete</button></div></div>`).join("");
+ $("#v-history").querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>show("today",{id:b.dataset.e}));
+ $("#v-history").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{if(confirm("Delete this session?")){sessions=sessions.filter(s=>s.id!==b.dataset.x);save();renderHistory()}});
+}
+
+// ---- Progress ----
+let charts=[];
+function chart(id,cfg){if(!window.Chart){return}cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#e8eaf0"}}},scales:{x:{ticks:{color:"#8b93a7"},grid:{color:"#2a2e38"}},y:{ticks:{color:"#8b93a7"},grid:{color:"#2a2e38"},beginAtZero:true}}},cfg.options||{});charts.push(new Chart(document.getElementById(id),cfg))}
+const COLORS=["#4f9cff","#3ecf8e","#ffb84f","#ff5d5d","#b57bff","#4fe0e0"];
+function renderProgress(){
+ charts.forEach(c=>c.destroy());charts=[];
+ const wk=[...Array(WEEKS)].map((_,i)=>i+1),labels=wk.map(w=>"W"+w);
+ const groups=["Chest","Legs","Back","Shoulders/Core","Calisthenics/Balance"];
+ const inW=w=>sessions.filter(s=>s.week===w);
+ const tot=wk.map(w=>Math.round(inW(w).reduce((a,s)=>a+vol(s),0)));
+ const avg=(w,k)=>{const a=inW(w);return a.length?+(a.reduce((x,s)=>x+s[k],0)/a.length).toFixed(1):null};
+ const rehabNames=[...new Set(Object.values(PROGRAM).flatMap(p=>p.ex.filter(e=>e.rehab).map(e=>e.name)))];
+ const lastW=weights.length?weights[weights.length-1].kg:START_WEIGHT;
+ $("#sub").textContent=sessions.length+" sessions · current "+lastW+" kg ("+(lastW-START_WEIGHT>=0?"+":"")+(lastW-START_WEIGHT).toFixed(1)+")";
+ $("#v-progress").innerHTML=`${window.Chart?"":'<div class="card mu">Charts need internet once to load Chart.js.</div>'}
+ <h2>Weekly volume (kg)</h2><div class="card"><div style="height:240px"><canvas id="c1"></canvas></div></div>
+ <h2>Volume by muscle group</h2><div class="card"><div style="height:260px"><canvas id="c2"></canvas></div></div>
+ <h2>Average pain by week</h2><div class="card"><div style="height:240px"><canvas id="c3"></canvas></div></div>
+ <h2>Rehab max weight (kg)</h2><div class="card"><div style="height:240px"><canvas id="c4"></canvas></div></div>
+ <h2>Body weight</h2><div class="card"><div class="row"><input type="date" id="bwD" value="${iso(new Date())}"><input type="number" step="0.1" inputmode="decimal" id="bwK" placeholder="kg"><button class="p" id="bwAdd" style="flex:0 0 auto">Add</button></div><div style="height:240px;margin-top:10px"><canvas id="c5"></canvas></div><table id="bwT"></table></div>`;
+ chart("c1",{type:"bar",data:{labels,datasets:[{label:"Total volume",data:tot,backgroundColor:"#4f9cff"}]}});
+ chart("c2",{type:"bar",data:{labels,datasets:groups.map((g,i)=>({label:g,backgroundColor:COLORS[i],data:wk.map(w=>Math.round(inW(w).filter(s=>s.group===g).reduce((a,s)=>a+vol(s),0)))}))},options:{scales:{x:{stacked:true,ticks:{color:"#8b93a7"}},y:{stacked:true,ticks:{color:"#8b93a7"},beginAtZero:true}}}});
+ chart("c3",{type:"line",data:{labels,datasets:[{label:"Arm",data:wk.map(w=>avg(w,"armPain")),borderColor:"#ffb84f",spanGaps:true},{label:"Knee",data:wk.map(w=>avg(w,"kneePain")),borderColor:"#ff5d5d",spanGaps:true}]},options:{scales:{y:{min:0,max:10,ticks:{color:"#8b93a7"}},x:{ticks:{color:"#8b93a7"}}}}});
+ chart("c4",{type:"line",data:{labels,datasets:rehabNames.map((n,i)=>({label:n.replace("Arm Rehab ",""),borderColor:COLORS[i],spanGaps:true,data:wk.map(w=>{const m=Math.max(0,...inW(w).flatMap(s=>s.ex.filter(e=>e.name===n).flatMap(e=>e.sets.map(t=>t.w||0))));return m||null})}))}});
+ const bw=[{date:iso(START)+" (start)",kg:START_WEIGHT},...weights];
+ chart("c5",{type:"line",data:{labels:bw.map(x=>x.date.slice(5)),datasets:[{label:"kg",data:bw.map(x=>x.kg),borderColor:"#3ecf8e"}]},options:{scales:{y:{beginAtZero:false,ticks:{color:"#8b93a7"}},x:{ticks:{color:"#8b93a7"}}}}});
+ $("#bwT").innerHTML=[...weights].reverse().map(x=>`<tr><td>${x.date}</td><td>${x.kg} kg</td><td><button class="d" data-bw="${x.date}">✕</button></td></tr>`).join("");
+ $("#bwAdd").onclick=()=>{const kg=parseFloat($("#bwK").value),d=$("#bwD").value;if(!kg||!d)return;weights=weights.filter(x=>x.date!==d);weights.push({date:d,kg});weights.sort((a,b)=>a.date.localeCompare(b.date));save();renderProgress()};
+ $("#bwT").querySelectorAll("[data-bw]").forEach(b=>b.onclick=()=>{weights=weights.filter(x=>x.date!==b.dataset.bw);save();renderProgress()});
+}
+
+// ---- Settings ----
+function download(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function toCSV(){const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';const rows=[["date","week","day","exercise","rehab","set","weight_kg","reps","arm_pain","knee_pain","notes"]];
+ sessions.forEach(s=>{if(!s.ex.length)rows.push([s.date,s.week,s.day,"","","","","",s.armPain,s.kneePain,s.notes]);s.ex.forEach(e=>e.sets.forEach((t,i)=>rows.push([s.date,s.week,s.day,e.name,e.rehab?1:0,i+1,t.w,t.r,s.armPain,s.kneePain,s.notes])))});
+ weights.forEach(w=>rows.push([w.date,weekOf(w.date),"Body weight","","","",w.kg,"","","",""]));return rows.map(r=>r.map(q).join(",")).join("\r\n")}
+function renderSettings(){
+ $("#v-settings").innerHTML=`<h2>Data</h2><div class="card mu">Saved on this device only (browser storage). Export regularly as a backup.<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"></div>
+ <h2>Change PIN</h2><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="width:100%;margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="width:100%;margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="width:100%;margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
+ <h2>About</h2><div class="card mu">Arwin · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
+ $("#exJ").onclick=()=>download("gym-log-"+iso(new Date())+".json",JSON.stringify({app:"gym-log",version:1,sessions,weights},null,2),"application/json");
+ $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
+ $("#imJ").onclick=()=>$("#imF").click();
+ $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" sessions from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];save();toast("Imported ✓")}catch(x){alert("Not a valid Gym Log JSON file")}};
+ $("#pSave").onclick=async()=>{const o=$("#pOld").value,n=$("#pNew").value;if((await sha(o))!==pinHash())return alert("Current PIN is wrong");if(!/^\d{4}$/.test(n))return alert("New PIN must be 4 digits");if(n!==$("#pNew2").value)return alert("New PINs don't match");localStorage.setItem("gym.pinHash",await sha(n));toast("PIN changed ✓");renderSettings()};
+ $("#lockNow").onclick=()=>{sessionStorage.removeItem("gym.unlocked");$("#lock").classList.remove("hid")};
+}
+
+// ---- PWA manifest (inline) ----
+(function(){const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#0f1115"/><text x="256" y="330" font-size="280" text-anchor="middle">🏋️</text></svg>`;
+ const icon="data:image/svg+xml,"+encodeURIComponent(svg);
+ const base=location.href.replace(/[#?].*$/,"");
+ const m={name:"Arwin's Gym Log",short_name:"Gym Log",start_url:base,scope:base.replace(/[^/]*$/,""),display:"standalone",background_color:"#0f1115",theme_color:"#0f1115",icons:[{src:icon,sizes:"512x512",type:"image/svg+xml",purpose:"any"}]};
+ $("#mf").href="data:application/manifest+json,"+encodeURIComponent(JSON.stringify(m));$("#ati").href=icon})();
+
+buildPad();
+if(sessionStorage.getItem("gym.unlocked")==="1")$("#lock").classList.add("hid");
+if(!window.isSecureContext||!crypto.subtle){$("#pinErr").textContent="PIN check unavailable on this connection; app unlocked.";$("#lock").classList.add("hid")}
+show("today");
+</script></body></html>
