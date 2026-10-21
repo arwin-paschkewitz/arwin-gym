@@ -63,6 +63,11 @@ input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 .cam{position:relative;min-height:40px;width:44px;padding:0;font-size:20px;background:rgba(47,140,255,.15) center/cover;flex:0 0 auto}.cam .ce{font-style:normal}.cam.has .ce{visibility:hidden}.cam.has{outline:2px solid var(--ac)}
 .cb{position:absolute;top:-6px;right:-6px;background:var(--ac);color:#fff;border-radius:10px;font-size:11px;min-width:18px;height:18px;line-height:18px;text-align:center;padding:0 4px;text-shadow:none}
 .awb .mv{flex:0 0 auto}.awb .mv button{min-width:42px}
+.rl{position:relative;height:22px;margin:2px 0 0;display:flex;align-items:center;justify-content:center}.rl::before{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:rgba(47,140,255,.45);border-radius:2px}
+.rl .rf{position:absolute;left:0;top:50%;height:4px;margin-top:-1px;background:var(--ac);border-radius:2px;width:0}.rl.off::before{background:#333}
+.rt{position:relative;min-height:22px;height:22px;padding:0 10px;font-size:13px;background:var(--bg);color:var(--ac);border-radius:11px;font-variant-numeric:tabular-nums}.rl.off .rt{color:var(--mu)}
+.rl.live{height:30px}.rl.live .rt{background:var(--ac);color:#fff;height:26px;font-size:15px}.rl.live::before{height:4px;margin-top:-1px;background:#1d2b3f}
+.rpv{text-align:center;font-size:44px;font-weight:800;margin:10px 0;font-variant-numeric:tabular-nums}
 </style></head><body>
 <div id="lock"><h1>🔒 Gym Log</h1><div class="mu">Enter PIN</div><div id="pinDots"></div><div class="pad" id="pad"></div><div id="pinErr" class="mu"></div></div>
 <header><h1 id="title">Workout</h1><div id="hdrR"></div></header>
@@ -250,7 +255,7 @@ function previewTpl(id){const t=tpl.find(x=>x.id===id);
  s.querySelector("#go").onclick=()=>{s.remove();startWorkout(t)}}
 function startWorkout(t){if(active&&!confirm("Discard the workout in progress and start a new one?"))return;
  active={id:null,start:Date.now(),date:iso(new Date()),tplId:t?t.id:null,name:t?t.name:"Workout",dow:t&&t.dow!=null&&t.dow!==""?+t.dow:new Date().getDay(),group:t?t.group:"Other",note:t?t.note:"",
-  ex:t?t.items.filter(i=>exById(i.exId)).map(i=>({exId:i.exId,target:i.reps,sets:Array.from({length:+i.sets||1},()=>({w:"",r:"",done:false}))})):[],armPain:0,kneePain:0,notes:""};
+  ex:t?t.items.filter(i=>exById(i.exId)).map(i=>{const rs=i.rest!=null?+i.rest:restDur;return{exId:i.exId,target:i.reps,rest:rs,sets:Array.from({length:+i.sets||1},()=>({w:"",r:"",done:false,rest:rs}))}}):[],armPain:0,kneePain:0,notes:""};
  saveActive();renderActive()}
 
 // ---- Active workout (full screen) ----
@@ -261,8 +266,8 @@ function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList
  a.ex.forEach((e,i)=>{const x=exById(e.exId)||{name:e.name||e.exId};const prev=prevSets(e.exId,a.id);
   h+=`<div class="exb ${x.rehab?"rehab":""}" style="${x.rehab?"padding-left:8px":""}"><div class="rowb"><div class="exn"><button class="lnk" data-xd="${esc(e.exId)}">${esc(x.name)} ⓘ</button><button class="cam" data-cam="${esc(e.exId)}" aria-label="Machine photos"><i class="ce">📷</i><span class="cb hid"></span></button></div><div class="mv"><button class="sm" data-up="${i}" aria-label="Move up">▲</button><button class="sm" data-dn="${i}" aria-label="Move down">▼</button><button class="d" data-rx="${i}" aria-label="Remove">✕</button></div></div>${e.target?`<div class="mu">Target ${e.sets.length} × ${esc(e.target)}${x.rehab?" · rehab, keep light":""}</div>`:""}
   <div class="st hd"><span>SET</span><span>PREVIOUS</span><span>KG</span><span>REPS</span><span>✓</span></div>`;
-  e.sets.forEach((s,j)=>{const p=prev[j];h+=`<div class="st ${s.done?"dn":""}" data-i="${i}" data-j="${j}"><span>${j+1}</span><span class="mu">${p&&(p.w!=null||p.r!=null)?(p.w??"–")+" × "+(p.r??"–"):"–"}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="iw" value="${s.w??""}" placeholder="${p&&p.w!=null?p.w:""}"><input type="number" inputmode="numeric" min="0" class="ir" value="${s.r??""}" placeholder="${p&&p.r!=null?p.r:""}"><button class="ck" aria-label="Done">✓</button></div>`});
-  h+=`<div class="row" style="margin-top:6px"><button class="ghost" data-as="${i}">+ Add set</button>${e.sets.length?`<button class="ghost" data-rs="${i}">− Set</button>`:""}</div></div>`});
+  e.sets.forEach((s,j)=>{const p=prev[j];h+=`<div class="st ${s.done?"dn":""}" data-i="${i}" data-j="${j}"><span>${j+1}</span><span class="mu">${p&&(p.w!=null||p.r!=null)?(p.w??"–")+" × "+(p.r??"–"):"–"}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="iw" value="${s.w??""}" placeholder="${p&&p.w!=null?p.w:""}"><input type="number" inputmode="numeric" min="0" class="ir" value="${s.r??""}" placeholder="${p&&p.r!=null?p.r:""}"><button class="ck" aria-label="Done">✓</button></div><div class="rl ${restOf(e,s)?"":"off"}" data-ri="${i}" data-rj="${j}"><span class="rf"></span><button class="rt" data-rt="${i},${j}">${restOf(e,s)?fmtT(restOf(e,s)*1000):"Off"}</button></div>`});
+  h+=`<div class="row" style="margin-top:6px"><button class="ghost" data-as="${i}">+ Add Set (${exRest(e)?fmtT(exRest(e)*1000):"Off"})</button>${e.sets.length?`<button class="ghost" data-rs="${i}">− Set</button>`:""}</div></div>`});
  h+=`<button class="w ghost" id="awAdd">+ Add exercises</button>
  <div class="card"><label>Arm pain: <b id="apv">${a.armPain}</b>/10<input type="range" min="0" max="10" id="ap" value="${a.armPain}"></label><label>Knee pain: <b id="kpv">${a.kneePain}</b>/10<input type="range" min="0" max="10" id="kp" value="${a.kneePain}"></label><label>Notes<textarea id="notes">${esc(a.notes)}</textarea></label>
  <label>Rest timer (seconds)<input type="number" inputmode="numeric" id="restD" value="${restDur}"></label></div>
@@ -279,20 +284,40 @@ function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList
  const at=(sel,f)=>m.querySelectorAll(sel).forEach(b=>b.onclick=()=>f(b));
  at("[data-xd]",b=>exDetail(b.dataset.xd));
  at("[data-cam]",b=>camSheet(b.dataset.cam));camBadges();
- at("[data-as]",b=>{const e=a.ex[+b.dataset.as],l=e.sets[e.sets.length-1];e.sets.push({w:l?l.w:"",r:l?l.r:"",done:false});saveActive();renderActive()});
+ at("[data-as]",b=>{const e=a.ex[+b.dataset.as],l=e.sets[e.sets.length-1];e.sets.push({w:l?l.w:"",r:l?l.r:"",done:false,rest:exRest(e)});saveActive();renderActive()});
  at("[data-rs]",b=>{a.ex[+b.dataset.rs].sets.pop();saveActive();renderActive()});
  at("[data-rx]",b=>{if(confirm("Remove "+exName(a.ex[+b.dataset.rx].exId)+" from this workout?")){a.ex.splice(+b.dataset.rx,1);saveActive();renderActive()}});
  at("[data-up]",b=>{const i=+b.dataset.up;if(i>0){[a.ex[i-1],a.ex[i]]=[a.ex[i],a.ex[i-1]];saveActive();renderActive()}});
  at("[data-dn]",b=>{const i=+b.dataset.dn;if(i<a.ex.length-1){[a.ex[i+1],a.ex[i]]=[a.ex[i],a.ex[i+1]];saveActive();renderActive()}});
  m.querySelectorAll(".st[data-i]").forEach(r=>{const s=a.ex[+r.dataset.i].sets[+r.dataset.j],iw=r.querySelector(".iw"),ir=r.querySelector(".ir");
   iw.oninput=()=>{s.w=iw.value;saveActive()};ir.oninput=()=>{s.r=ir.value;saveActive()};
-  r.querySelector(".ck").onclick=()=>{if(!s.done){if(s.w===""&&iw.placeholder){s.w=iw.value=iw.placeholder}if(s.r===""&&ir.placeholder){s.r=ir.value=ir.placeholder}restEnd=Date.now()+restDur*1000}s.done=!s.done;r.classList.toggle("dn",s.done);saveActive();tickFn()}});
+  r.querySelector(".ck").onclick=()=>{if(!s.done){if(s.w===""&&iw.placeholder){s.w=iw.value=iw.placeholder}if(s.r===""&&ir.placeholder){s.r=ir.value=ir.placeholder}unlockAudio();startRest(+r.dataset.i,+r.dataset.j)}else if(restAt&&restAt[0]==+r.dataset.i&&restAt[1]==+r.dataset.j){restEnd=0;restAt=null}s.done=!s.done;r.classList.toggle("dn",s.done);saveActive();tickFn()}});
+ at("[data-rt]",b=>{const[i,j]=b.dataset.rt.split(",").map(Number);restPicker(i,j)});
  tickFn()}
 function tickFn(){const t=$("#awT");if(active){const txt=active.id?"Editing":fmtT(Date.now()-active.start);if(t)t.textContent=txt;$("#rbT").textContent=txt}
  const r=$("#rest");if(!r)return;const left=restEnd-Date.now();
  if(left>0&&active){r.classList.remove("hid");r.innerHTML=`<span>Rest</span><b>${fmtT(left)}</b><button id="rm">−15</button><button id="rp">+15</button><button id="rk">Skip</button>`;
-  $("#rm").onclick=()=>{restEnd-=15000;tickFn()};$("#rp").onclick=()=>{restEnd+=15000;tickFn()};$("#rk").onclick=()=>{restEnd=0;tickFn()}}
- else{if(restEnd&&left<=0&&left>-1500&&navigator.vibrate)navigator.vibrate(300);r.classList.add("hid")}}
+  $("#rm").onclick=()=>{restEnd-=15000;tickFn()};$("#rp").onclick=()=>{restEnd+=15000;restTot=Math.max(restTot,restEnd-Date.now());tickFn()};$("#rk").onclick=()=>{restEnd=0;restAt=null;tickFn()}}
+ else{if(restEnd&&left<=0){restDone()}restEnd=0;r.classList.add("hid")}
+ document.querySelectorAll("#aw .rl.live").forEach(l=>{if(!(restAt&&restEnd&&+l.dataset.ri===restAt[0]&&+l.dataset.rj===restAt[1])){l.classList.remove("live");const e=active&&active.ex[+l.dataset.ri],s2=e&&e.sets[+l.dataset.rj];if(s2){const v=restOf(e,s2);l.querySelector(".rt").textContent=v?fmtT(v*1000):"Off"}l.querySelector(".rf").style.width=""}});
+ if(restAt&&restEnd&&left>0){const l=document.querySelector(`#aw .rl[data-ri="${restAt[0]}"][data-rj="${restAt[1]}"]`);if(l){l.classList.add("live");l.querySelector(".rt").textContent=fmtT(left);l.querySelector(".rf").style.width=Math.max(0,Math.min(100,left/restTot*100))+"%"}}}
+let restAt=null,restTot=1,actx=null;
+const exRest=e=>e.rest!=null?+e.rest:restDur;
+const restOf=(e,s)=>s&&s.rest!=null?+s.rest:exRest(e);
+function startRest(i,j){const e=active.ex[i],v=restOf(e,e.sets[j]);if(!v){restEnd=0;restAt=null;return}restTot=v*1000;restEnd=Date.now()+restTot;restAt=[i,j]}
+function unlockAudio(){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume()}catch(e){}}
+function beep(){try{unlockAudio();[0,.25,.5].forEach(t=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.setValueAtTime(.0001,actx.currentTime+t);g.gain.exponentialRampToValueAtTime(.4,actx.currentTime+t+.02);g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+t+.18);o.connect(g).connect(actx.destination);o.start(actx.currentTime+t);o.stop(actx.currentTime+t+.2)})}catch(e){}}
+function restDone(){restAt=null;if(navigator.vibrate)navigator.vibrate([300,100,300]);beep();toast("Rest over 💪")}
+function restPicker(i,j){const e=active.ex[i],s0=e.sets[j];let v=restOf(e,s0);
+ const sh=openSheet("Rest timer · "+exName(e.exId)+" set "+(j+1),`<div class="rpv" id="rpv"></div><div class="row"><button class="ghost" id="rpm">−15s</button><button class="ghost" id="rpp">+15s</button></div>
+ <div class="tg">${[30,60,90,120,150,180,300].map(x=>`<button class="sm" data-pv="${x}">${fmtT(x*1000)}</button>`).join("")}<button class="d" data-pv="0">Off</button></div>
+ <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="rpa" checked style="width:24px;min-height:24px"> Apply to all sets of this exercise</label><button class="p w" id="rpOk">Done</button>`);
+ const q=k=>sh.querySelector(k),draw=()=>q("#rpv").textContent=v?fmtT(v*1000):"Off";draw();
+ q("#rpm").onclick=()=>{v=Math.max(0,v-15);draw()};q("#rpp").onclick=()=>{v+=15;draw()};
+ sh.querySelectorAll("[data-pv]").forEach(b=>b.onclick=()=>{v=+b.dataset.pv;draw()});
+ q("#rpOk").onclick=()=>{if(q("#rpa").checked){e.rest=v;e.sets.forEach(x=>x.rest=v);const t=active.tplId&&tpl.find(t=>t.id===active.tplId),it=t&&t.items.find(x=>x.exId===e.exId);if(it){it.rest=v;saveLib()}}else s0.rest=v;
+  if(restAt&&restAt[0]===i&&restAt[1]===j&&restEnd){restTot=v*1000;restEnd=v?Date.now()+restTot:0}
+  saveActive();sh.remove();renderActive()}}
 function finishWorkout(){const a=active;
  const ex=a.ex.map(e=>{const x=exById(e.exId)||{};return{exId:e.exId,name:x.name||e.name||e.exId,rehab:!!x.rehab,group:a.group,sets:e.sets.filter(s=>s.done||s.w!==""||s.r!=="").map(s=>({w:s.w===""||s.w==null?null:+s.w,r:s.r===""||s.r==null?null:+s.r}))}}).filter(e=>e.sets.length);
  if(!ex.length&&!confirm("No sets logged. Save anyway?"))return;
@@ -463,7 +488,7 @@ restDur=LS.get("gym.rest",90);
 buildPad();
 if(sessionStorage.getItem("gym.unlocked")==="1")$("#lock").classList.add("hid");
 if(!window.isSecureContext||!crypto.subtle){$("#pinErr").textContent="PIN check unavailable on this connection; app unlocked.";$("#lock").classList.add("hid")}
-tick=setInterval(tickFn,1000);
+tick=setInterval(tickFn,250);
 show("workout");
 if(active)renderActive();
 </script></body></html>
