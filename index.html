@@ -59,6 +59,10 @@ input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 .howGrid figcaption{font-size:13px;color:var(--mu);margin-top:4px}.howCues{margin:8px 0 0;padding-left:20px}.howCues li{margin:4px 0}
 @media(max-width:520px){.howGrid{grid-template-columns:1fr}.howGrid figure{display:grid;grid-template-columns:42% 1fr;gap:8px;align-items:center}}
 .tg{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.tg button{flex:1 1 45%;min-height:52px}.pg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.pg figure{margin:0;background:var(--card);border-radius:10px;padding:6px}.pg img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block}.pg figcaption{font-size:13px;margin:4px 0}.pg .row button{min-height:44px}
+.exn{display:flex;align-items:center;gap:6px;flex:1;min-width:0;flex-wrap:wrap}.exn .lnk{min-width:0;overflow-wrap:anywhere}
+.cam{position:relative;min-height:40px;width:44px;padding:0;font-size:20px;background:rgba(47,140,255,.15) center/cover;flex:0 0 auto}.cam .ce{font-style:normal}.cam.has .ce{visibility:hidden}.cam.has{outline:2px solid var(--ac)}
+.cb{position:absolute;top:-6px;right:-6px;background:var(--ac);color:#fff;border-radius:10px;font-size:11px;min-width:18px;height:18px;line-height:18px;text-align:center;padding:0 4px;text-shadow:none}
+.awb .mv{flex:0 0 auto}.awb .mv button{min-width:42px}
 </style></head><body>
 <div id="lock"><h1>🔒 Gym Log</h1><div class="mu">Enter PIN</div><div id="pinDots"></div><div class="pad" id="pad"></div><div id="pinErr" class="mu"></div></div>
 <header><h1 id="title">Workout</h1><div id="hdrR"></div></header>
@@ -255,7 +259,7 @@ function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList
  let h=`<div class="awh"><button class="sm" id="awMin" aria-label="Minimise">⌄</button><div class="awt" id="awT"></div><button class="ok" id="awFin">${a.id?"Save":"Finish"}</button></div><div class="awb">
  <input class="ttl" id="awName" value="${esc(a.name)}" aria-label="Workout name"><input type="date" id="awDate" value="${a.date}" style="margin-top:4px">${a.note?`<div class="mu" style="margin-top:6px">ℹ️ ${esc(a.note)}</div>`:""}`;
  a.ex.forEach((e,i)=>{const x=exById(e.exId)||{name:e.name||e.exId};const prev=prevSets(e.exId,a.id);
-  h+=`<div class="exb ${x.rehab?"rehab":""}" style="${x.rehab?"padding-left:8px":""}"><div class="rowb"><button class="lnk" data-xd="${esc(e.exId)}">${esc(x.name)} ⓘ</button><div class="mv"><button class="sm" data-up="${i}" aria-label="Move up">▲</button><button class="sm" data-dn="${i}" aria-label="Move down">▼</button><button class="d" data-rx="${i}" aria-label="Remove">✕</button></div></div>${e.target?`<div class="mu">Target ${e.sets.length} × ${esc(e.target)}${x.rehab?" · rehab, keep light":""}</div>`:""}
+  h+=`<div class="exb ${x.rehab?"rehab":""}" style="${x.rehab?"padding-left:8px":""}"><div class="rowb"><div class="exn"><button class="lnk" data-xd="${esc(e.exId)}">${esc(x.name)} ⓘ</button><button class="cam" data-cam="${esc(e.exId)}" aria-label="Machine photos"><i class="ce">📷</i><span class="cb hid"></span></button></div><div class="mv"><button class="sm" data-up="${i}" aria-label="Move up">▲</button><button class="sm" data-dn="${i}" aria-label="Move down">▼</button><button class="d" data-rx="${i}" aria-label="Remove">✕</button></div></div>${e.target?`<div class="mu">Target ${e.sets.length} × ${esc(e.target)}${x.rehab?" · rehab, keep light":""}</div>`:""}
   <div class="st hd"><span>SET</span><span>PREVIOUS</span><span>KG</span><span>REPS</span><span>✓</span></div>`;
   e.sets.forEach((s,j)=>{const p=prev[j];h+=`<div class="st ${s.done?"dn":""}" data-i="${i}" data-j="${j}"><span>${j+1}</span><span class="mu">${p&&(p.w!=null||p.r!=null)?(p.w??"–")+" × "+(p.r??"–"):"–"}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="iw" value="${s.w??""}" placeholder="${p&&p.w!=null?p.w:""}"><input type="number" inputmode="numeric" min="0" class="ir" value="${s.r??""}" placeholder="${p&&p.r!=null?p.r:""}"><button class="ck" aria-label="Done">✓</button></div>`});
   h+=`<div class="row" style="margin-top:6px"><button class="ghost" data-as="${i}">+ Add set</button>${e.sets.length?`<button class="ghost" data-rs="${i}">− Set</button>`:""}</div></div>`});
@@ -274,6 +278,7 @@ function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList
  $("#awAdd").onclick=()=>pickExercise(id=>{a.ex.push({exId:id,target:"",sets:[{w:"",r:"",done:false}]});saveActive();renderActive()});
  const at=(sel,f)=>m.querySelectorAll(sel).forEach(b=>b.onclick=()=>f(b));
  at("[data-xd]",b=>exDetail(b.dataset.xd));
+ at("[data-cam]",b=>camSheet(b.dataset.cam));camBadges();
  at("[data-as]",b=>{const e=a.ex[+b.dataset.as],l=e.sets[e.sets.length-1];e.sets.push({w:l?l.w:"",r:l?l.r:"",done:false});saveActive();renderActive()});
  at("[data-rs]",b=>{a.ex[+b.dataset.rs].sets.pop();saveActive();renderActive()});
  at("[data-rx]",b=>{if(confirm("Remove "+exName(a.ex[+b.dataset.rx].exId)+" from this workout?")){a.ex.splice(+b.dataset.rx,1);saveActive();renderActive()}});
@@ -378,6 +383,11 @@ async function drawPhotos(x){const box=document.getElementById("ph-"+x.id);if(!b
  box.querySelectorAll("[data-pd]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this photo?"))return;await delPhoto(b.dataset.pd);toast("Photo deleted");drawPhotos(x)});
  box.querySelectorAll("[data-pv]").forEach(im=>im.onclick=()=>{const p=P(im.dataset.pv);openSheet(p.type,`<img src="${p.src}" style="width:100%;border-radius:12px"><div style="margin-top:8px">${esc(p.label||"")}</div><div class="mu">${dmy(p.ts.slice(0,10))}</div>`)})}
 
+function camSheet(id){const x=exById(id);if(!x)return toast("Exercise no longer in library");const s=openSheet("📷 "+x.name,`<div id="ph-${esc(x.id)}"><div class="mu">Loading…</div></div>`);
+ s.querySelector("[data-close]").onclick=()=>{s.remove();camBadges()};drawPhotos(x)}
+async function camBadges(){let ps=[];try{ps=await allPhotos()}catch(e){return}
+ document.querySelectorAll("#aw [data-cam]").forEach(b=>{const l=ps.filter(p=>p.exId===b.dataset.cam),c=b.querySelector(".cb");c.textContent=l.length;c.classList.toggle("hid",!l.length);
+  b.style.backgroundImage=l.length?`url(${l[l.length-1].src})`:"";b.classList.toggle("has",!!l.length)})}
 // ---- Template editor ----
 function editTpl(id){const orig=id?tpl.find(t=>t.id===id):null;const t=orig?JSON.parse(JSON.stringify(orig)):{id:"t"+uid(),name:"New template",dow:"",group:"Other",note:"",items:[]};
  const s=openSheet(orig?"Edit template":"New template","",'<button class="ok" id="tS">Save</button>');const b=s.querySelector(".shb");
