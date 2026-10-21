@@ -48,6 +48,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px;borde
 input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 .exb{margin:18px 0}.st{display:grid;grid-template-columns:30px 1fr 64px 64px 48px;gap:6px;align-items:center;padding:4px;border-radius:8px;margin-top:4px;text-align:center}
 .sb{padding:0;min-height:32px;height:32px;width:30px;flex:0 0 30px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:var(--card2);color:#fff;font-weight:700;font-size:14px}.sb.tW{color:#ff9f0a;background:rgba(255,159,10,.18)}.sb.tD{color:#bf5af2;background:rgba(191,90,242,.18)}.sb.tF{color:#ff453a;background:rgba(255,69,58,.18)}.stm button{display:flex;align-items:center;gap:12px;width:100%;margin-top:6px;text-align:left}.stm .sb{display:flex!important;justify-content:center!important;align-items:center!important;text-align:center!important;padding:0!important}.stm button.on{outline:2px solid var(--ac)}.tb{display:inline-block;min-width:16px;font-weight:700;margin-right:2px}.tb.tW{color:#ff9f0a}.tb.tD{color:#bf5af2}.tb.tF{color:#ff453a}
+.coach{background:rgba(47,140,255,.12);border:1px solid rgba(47,140,255,.4);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px;line-height:1.4}.ctip{background:var(--card2);border-radius:10px;padding:6px 10px;margin:6px 0;font-size:13px;line-height:1.4}.ctip summary{cursor:pointer;font-weight:700;color:var(--ac);padding:4px 0}.ctip .howCues{margin:4px 0 4px 18px}.cwarn{background:rgba(255,159,10,.15);border-left:3px solid #ff9f0a;color:#ffcc80;padding:5px 8px;border-radius:6px;margin:4px 0}
 .st.hd{font-size:12px;color:var(--mu);font-weight:700}.st input{text-align:center;padding:6px 2px;min-height:40px}
 .st .ck{padding:0;min-height:40px}.st.dn{background:rgba(48,209,88,.16)}.st.dn .ck{background:var(--ok);color:#000}.st.dn input{background:transparent}
 .rest{position:fixed;left:0;right:0;bottom:0;background:var(--ac);color:#fff;display:flex;align-items:center;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:45;font-weight:700}
@@ -123,7 +124,7 @@ const fmtT=ms=>{const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=M
 let pinBuf="";
 function buildPad(){const p=$("#pad");["1","2","3","4","5","6","7","8","9","⌫","0","✓"].forEach(k=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>pinKey(k);p.appendChild(b)})}
 async function pinKey(k){if(k==="⌫")pinBuf=pinBuf.slice(0,-1);else if(k==="✓")return tryPin();else if(pinBuf.length<8)pinBuf+=k;$("#pinDots").textContent="•".repeat(pinBuf.length);if(pinBuf.length===4)tryPin()}
-async function tryPin(){if((await sha(pinBuf))===pinHash()){$("#lock").classList.add("hid");sessionStorage.setItem("gym.unlocked","1");$("#pinErr").textContent=""}else{$("#pinErr").textContent="Wrong PIN"}pinBuf="";$("#pinDots").textContent=""}
+async function tryPin(){if((await sha(pinBuf))===pinHash()){appPin=pinBuf;loadTips().then(()=>{if(active&&!$("#aw").classList.contains("hid"))renderActive()});$("#lock").classList.add("hid");sessionStorage.setItem("gym.unlocked","1");$("#pinErr").textContent=""}else{$("#pinErr").textContent="Wrong PIN"}pinBuf="";$("#pinDots").textContent=""}
 document.addEventListener("keydown",e=>{if($("#lock").classList.contains("hid"))return;if(/^\d$/.test(e.key))pinKey(e.key);else if(e.key==="Backspace")pinKey("⌫");else if(e.key==="Enter")pinKey("✓")});
 // ---- How-to diagrams (HOWTO_V1) ----
 const SEAT=[["r",36,70,28,5],["l",42,75,42,100]],BACK=[["r",34,30,5,42]],RAIL=[["l",24,58,24,100],["l",18,58,30,58]];
@@ -259,18 +260,45 @@ function renderWorkout(){const dow=new Date().getDay();
 function previewTpl(id){const t=tpl.find(x=>x.id===id);
  const s=openSheet(tplLabel(t),`${t.note?`<div class="card mu">ℹ️ ${esc(t.note)}</div>`:""}${t.items.map(i=>`<div class="li"><div class="ico">${esc(exName(i.exId)[0]||"?")}</div><div><b>${esc(exName(i.exId))}</b><div class="mu">${i.sets} × ${esc(i.reps)}</div></div></div>`).join("")}<button class="p w" id="go">Start workout</button>`);
  s.querySelector("#go").onclick=()=>{s.remove();startWorkout(t)}}
-function startWorkout(t){if(active&&!confirm("Discard the workout in progress and start a new one?"))return;
- active={id:null,start:Date.now(),date:iso(new Date()),tplId:t?t.id:null,name:t?t.name:"Workout",dow:t&&t.dow!=null&&t.dow!==""?+t.dow:new Date().getDay(),group:t?t.group:"Other",note:t?t.note:"",
-  ex:t?t.items.filter(i=>exById(i.exId)).map(i=>{const rs=i.rest!=null?+i.rest:restDur;return{exId:i.exId,target:i.reps,rest:rs,sets:Array.from({length:+i.sets||1},()=>({w:"",r:"",done:false,rest:rs}))}}):[],armPain:0,kneePain:0,notes:""};
+function startWorkout(t){if(active&&!confirm("Discard the workout in progress and start a new one?"))return;loadTips().then(()=>{if(active&&document.querySelector("#aw:not(.hid)"))renderActive()});
+ active={id:null,start:Date.now(),date:iso(new Date()),tplId:t?t.id:null,name:t?t.name:"Workout",tplName:t?t.name:"",dow:t&&t.dow!=null&&t.dow!==""?+t.dow:new Date().getDay(),group:t?t.group:"Other",note:t?t.note:"",
+  ex:t?t.items.filter(i=>exById(i.exId)).map(i=>{const ct=coachRest(tipEx((exById(i.exId)||{}).name,t.name)),rs=i.rest!=null&&i.rest!==""?+i.rest:(ct||restDur);return{exId:i.exId,target:i.reps,rest:rs,sets:Array.from({length:+i.sets||1},()=>({w:"",r:"",done:false,rest:rs}))}}):[],armPain:0,kneePain:0,notes:""};
  saveActive();renderActive()}
+
+// ---- Coach tips ----
+let coachTips=null,appPin=null; // PIN and decrypted tips live in memory only
+const b64u8=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
+async function decTips(env,pin){const k0=await crypto.subtle.importKey("raw",new TextEncoder().encode(pin),"PBKDF2",false,["deriveKey"]);
+ const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt:b64u8(env.salt),iterations:env.iter||200000,hash:"SHA-256"},k0,{name:"AES-GCM",length:256},false,["decrypt"]);
+ return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64u8(env.iv)},key,b64u8(env.ct))))}
+function loadTips(){if(!appPin)return Promise.resolve();return fetch("coach-tips.enc.json?t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(async e=>{if(!e||e.v!==1)return;const j=await decTips(e,appPin);if(j&&typeof j==="object"&&j.templates&&typeof j.templates==="object")coachTips=j}).catch(()=>{})}
+const nrm=v=>String(v||"").toLowerCase().replace(/^[a-z]{3}\s*[·\-:]\s*/,"").trim();
+function tipTpl(name){const T=coachTips&&coachTips.templates;if(!T||!name)return null;if(T[name]&&typeof T[name]==="object")return T[name];const k=Object.keys(T).find(k=>k.toLowerCase()===String(name).toLowerCase())||Object.keys(T).find(k=>nrm(k)===nrm(name));return k&&typeof T[k]==="object"?T[k]:null}
+function tipEx(exName,tplName){const T=coachTips&&coachTips.templates;if(!T)return null;const find=o=>{const E=o&&o.exercises;if(!E||typeof E!=="object")return null;const k=E[exName]?exName:Object.keys(E).find(k=>k.toLowerCase()===String(exName).toLowerCase());return k&&typeof E[k]==="object"?E[k]:null};
+ return find(tipTpl(tplName))||Object.values(T).map(find).find(Boolean)||null}
+const coachRest=t=>{const m=t&&typeof t.rest==="string"&&t.rest.match(/(\d+(?:\.\d+)?)\s*(min|m\b)?/i);return m?Math.round(+m[1]*(m[2]?60:1)):null};
+const lab=k=>k.replace(/_/g," ").replace(/^./,c=>c.toUpperCase());
+const tipsUpd=()=>coachTips&&coachTips.updated?`<div class="mu" style="font-size:12px;margin-top:6px">Coach tips updated ${esc(/^\d{4}-\d\d-\d\d$/.test(coachTips.updated)?dmy(coachTips.updated):String(coachTips.updated))}</div>`:"";
+function tipBody(t){if(!t)return"";const out=[],str=v=>typeof v==="string"||typeof v==="number";
+ if(str(t.target))out.push(`<div><b>Target:</b> ${esc(t.target)}</div>`);
+ const rr=[str(t.rest)?`Rest ${esc(t.rest)}`:"",str(t.rpe)?`RPE ${esc(t.rpe)}/10`:""].filter(Boolean);if(rr.length)out.push(`<div><b>${rr.join(" · ")}</b></div>`);
+ if(Array.isArray(t.cues)&&t.cues.length)out.push(`<ul class="howCues">${t.cues.filter(str).map(c=>`<li>${esc(c)}</li>`).join("")}</ul>`);
+ if(str(t.caution))out.push(`<div class="cwarn">⚠️ ${esc(t.caution)}</div>`);
+ Object.keys(t).filter(k=>!["target","rest","rpe","cues","caution"].includes(k)&&str(t[k])).forEach(k=>out.push(`<div><b>${esc(lab(k))}:</b> ${esc(t[k])}</div>`));
+ return out.join("")}
+function coachBox(name){const t=tipTpl(name);if(!t)return"";const str=v=>typeof v==="string"&&v.trim();const rows=[];
+ if(str(t.session_note))rows.push(`<div>${esc(t.session_note)}</div>`);if(str(t.warmup))rows.push(`<div style="margin-top:6px"><b>Warm-up:</b> ${esc(t.warmup)}</div>`);
+ Object.keys(t).filter(k=>!["session_note","warmup","exercises"].includes(k)&&(typeof t[k]==="string"||typeof t[k]==="number")).forEach(k=>rows.push(`<div style="margin-top:6px"><b>${esc(lab(k))}:</b> ${esc(t[k])}</div>`));
+ return rows.length?`<div class="coach"><b>🧑‍🏫 Coach</b>${rows.join("")}${tipsUpd()}</div>`:""}
+function exTipHTML(name,tpl,open){const b=tipBody(tipEx(name,tpl));return b?`<details class="ctip"${open?" open":""}><summary>🧑‍🏫 Coach tips</summary>${b}${tipsUpd()}</details>`:""}
 
 // ---- Active workout (full screen) ----
 let restEnd=0,restDur=90,tick=null;
 function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList.remove("hid");updResume();
  let h=`<div class="awh"><button class="sm" id="awMin" aria-label="Minimise">⌄</button><div class="awt" id="awT"></div><button class="ok" id="awFin">${a.id?"Save":"Finish"}</button></div><div class="awb">
- <input class="ttl" id="awName" value="${esc(a.name)}" aria-label="Workout name"><input type="date" id="awDate" value="${a.date}" style="margin-top:4px">${a.note?`<div class="mu" style="margin-top:6px">ℹ️ ${esc(a.note)}</div>`:""}`;
+ <input class="ttl" id="awName" value="${esc(a.name)}" aria-label="Workout name"><input type="date" id="awDate" value="${a.date}" style="margin-top:4px">${a.note?`<div class="mu" style="margin-top:6px">ℹ️ ${esc(a.note)}</div>`:""}${coachBox(a.tplName||a.name)}`;
  a.ex.forEach((e,i)=>{const x=exById(e.exId)||{name:e.name||e.exId};const prev=prevSets(e.exId,a.id);
-  h+=`<div class="exb ${x.rehab?"rehab":""}" style="${x.rehab?"padding-left:8px":""}"><div class="rowb"><div class="exn"><button class="lnk" data-xd="${esc(e.exId)}">${esc(x.name)} ⓘ</button><button class="cam" data-cam="${esc(e.exId)}" aria-label="Machine photos"><i class="ce">📷</i><span class="cb hid"></span></button></div><div class="mv"><button class="sm" data-up="${i}" aria-label="Move up">▲</button><button class="sm" data-dn="${i}" aria-label="Move down">▼</button><button class="d" data-rx="${i}" aria-label="Remove">✕</button></div></div>${e.target?`<div class="mu">Target ${e.sets.length} × ${esc(e.target)}${x.rehab?" · rehab, keep light":""}</div>`:""}
+  h+=`<div class="exb ${x.rehab?"rehab":""}" style="${x.rehab?"padding-left:8px":""}"><div class="rowb"><div class="exn"><button class="lnk" data-xd="${esc(e.exId)}">${esc(x.name)} ⓘ</button><button class="cam" data-cam="${esc(e.exId)}" aria-label="Machine photos"><i class="ce">📷</i><span class="cb hid"></span></button></div><div class="mv"><button class="sm" data-up="${i}" aria-label="Move up">▲</button><button class="sm" data-dn="${i}" aria-label="Move down">▼</button><button class="d" data-rx="${i}" aria-label="Remove">✕</button></div></div>${e.target?`<div class="mu">Target ${e.sets.length} × ${esc(e.target)}${x.rehab?" · rehab, keep light":""}</div>`:""}${exTipHTML(x.name,a.tplName||a.name)}
   <div class="st hd"><span>SET</span><span>PREVIOUS</span><span>KG</span><span>REPS</span><span>✓</span></div>`;
   e.sets.forEach((s,j)=>{const p=prev[j];h+=`<div class="st ${s.done?"dn":""}" data-i="${i}" data-j="${j}"><button class="sb t${tCode(s.type)}" data-sb aria-label="Set type">${tCode(s.type)==="N"?j+1:tCode(s.type)}</button><span class="mu">${p&&(p.w!=null||p.r!=null)?(p.w??"–")+" × "+(p.r??"–"):"–"}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="iw" value="${s.w??""}" placeholder="${p&&p.w!=null?p.w:""}"><input type="number" inputmode="numeric" min="0" class="ir" value="${s.r??""}" placeholder="${p&&p.r!=null?p.r:""}"><button class="ck" aria-label="Done">✓</button></div><div class="rl ${restOf(e,s)?"":"off"}" data-ri="${i}" data-rj="${j}"><span class="rf"></span><button class="rt" data-rt="${i},${j}">${restOf(e,s)?fmtT(restOf(e,s)*1000):"Off"}</button></div>`});
   h+=`<div class="row" style="margin-top:6px"><button class="ghost" data-as="${i}">+ Add Set (${exRest(e)?fmtT(exRest(e)*1000):"Off"})</button>${e.sets.length?`<button class="ghost" data-rs="${i}">− Set</button>`:""}</div></div>`});
@@ -440,7 +468,7 @@ function exDetail(id,tab){const x=exById(id);if(!x)return toast("Exercise no lon
    <h3 class="h3">Instructions</h3>${st.length?`<ol class="steps">${st.map(t=>`<li>${esc(t)}</li>`).join("")}</ol>`:'<div class="mu">No instructions yet. Tap Edit to add them.</div>'}
    ${tips.length?`<h3 class="h3">Tips</h3><ul class="howCues">${tips.map(c=>`<li>${esc(c)}</li>`).join("")}</ul>`:""}
    ${x.safety?`<h3 class="h3">Safety</h3><div class="card" style="white-space:pre-wrap">${esc(x.safety)}</div>`:""}
-   ${stickHTML(x)}<div class="lbl">MACHINE TYPES &amp; PHOTOS</div><div id="ph-${esc(x.id)}"><div class="mu">Loading…</div></div>`;drawPhotos(x)}
+   ${coachTips?`<div style="margin-top:10px">${exTipHTML(x.name,"",true)}</div>`:""}${stickHTML(x)}<div class="lbl">MACHINE TYPES &amp; PHOTOS</div><div id="ph-${esc(x.id)}"><div class="mu">Loading…</div></div>`;drawPhotos(x)}
   else if(t==="History"){body.innerHTML=L.length?[...L].reverse().map(({s:h,e})=>`<div class="card"><div class="rowb"><b>${esc(h.day)}</b><span class="mu">${DAYS[h.dow]} ${dmy(h.date)}</span></div><table style="margin-top:6px"><tr><th>Set</th><th>kg × reps</th><th>Est. 1RM</th></tr>${e.sets.map((t,i)=>`<tr><td>${tBadge(t,i)}</td><td>${t.w??"–"} × ${t.r??"–"}</td><td>${t.w&&t.r&&t.type!=="Warm-up"?e1rm(t).toFixed(1):"–"}</td></tr>`).join("")}</table></div>`).join(""):'<div class="card mu" style="margin-top:10px">Not logged yet.</div>'}
   else if(t==="Charts"){if(!L.length){body.innerHTML='<div class="card mu" style="margin-top:10px">Log this exercise to see charts.</div>';return}
    body.innerHTML=`${window.Chart?"":'<div class="card mu">Charts need internet once to load.</div>'}<div class="card"><b>Best set weight (kg)</b><div style="height:200px"><canvas id="xc1"></canvas></div></div><div class="card"><b>Estimated 1RM (kg)</b><div style="height:200px"><canvas id="xc2"></canvas></div></div><div class="card"><b>Volume (kg × reps)</b><div style="height:200px"><canvas id="xc3"></canvas></div></div><div class="card"><b>Best reps</b><div style="height:200px"><canvas id="xc4"></canvas></div></div>`;
@@ -566,7 +594,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  $("#imJ").onclick=()=>$("#imF").click();
  $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;if(Array.isArray(d.photos))for(const p of d.photos)await putPhoto(p);migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
  $("#rst").onclick=()=>{if(!confirm("Reset exercises and templates to the default program? Your logged workouts are kept; custom exercises and edits are removed."))return;lib=defLib();tpl=defTpl();saveLib();toast("Program reset ✓");renderProfile()};
- $("#pSave").onclick=async()=>{const o=$("#pOld").value,n=$("#pNew").value;if((await sha(o))!==pinHash())return alert("Current PIN is wrong");if(!/^\d{4}$/.test(n))return alert("New PIN must be 4 digits");if(n!==$("#pNew2").value)return alert("New PINs don't match");localStorage.setItem("gym.pinHash",await sha(n));toast("PIN changed ✓");renderProfile()};
+ $("#pSave").onclick=async()=>{const o=$("#pOld").value,n=$("#pNew").value;if((await sha(o))!==pinHash())return alert("Current PIN is wrong");if(!/^\d{4}$/.test(n))return alert("New PIN must be 4 digits");if(n!==$("#pNew2").value)return alert("New PINs don't match");localStorage.setItem("gym.pinHash",await sha(n));toast("PIN changed ✓");renderProfile();setTimeout(()=>alert("Coach tips use your old PIN until Sarah updates them."),50)};
  $("#lockNow").onclick=()=>{sessionStorage.removeItem("gym.unlocked");$("#lock").classList.remove("hid")};
 }
 
@@ -591,6 +619,6 @@ buildPad();
 if(sessionStorage.getItem("gym.unlocked")==="1")$("#lock").classList.add("hid");
 if(!window.isSecureContext||!crypto.subtle){$("#pinErr").textContent="PIN check unavailable on this connection; app unlocked.";$("#lock").classList.add("hid")}
 tick=setInterval(tickFn,250);
-show("workout");
+show("workout");loadTips().then(()=>{if(active&&!$("#aw").classList.contains("hid"))renderActive()});
 if(active)renderActive();
 </script></body></html>
