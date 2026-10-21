@@ -58,6 +58,7 @@ input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 .howGrid figure{margin:0;background:var(--card2);border-radius:10px;padding:6px}.howGrid svg{width:100%;height:auto;display:block}
 .howGrid figcaption{font-size:13px;color:var(--mu);margin-top:4px}.howCues{margin:8px 0 0;padding-left:20px}.howCues li{margin:4px 0}
 @media(max-width:520px){.howGrid{grid-template-columns:1fr}.howGrid figure{display:grid;grid-template-columns:42% 1fr;gap:8px;align-items:center}}
+.tg{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.tg button{flex:1 1 45%;min-height:52px}.pg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.pg figure{margin:0;background:var(--card);border-radius:10px;padding:6px}.pg img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block}.pg figcaption{font-size:13px;margin:4px 0}.pg .row button{min-height:44px}
 </style></head><body>
 <div id="lock"><h1>🔒 Gym Log</h1><div class="mu">Enter PIN</div><div id="pinDots"></div><div class="pad" id="pad"></div><div id="pinErr" class="mu"></div></div>
 <header><h1 id="title">Workout</h1><div id="hdrR"></div></header>
@@ -322,9 +323,9 @@ function howHTML(x){const d=x.pose&&HOW[x.pose];if(!d)return"";return`<div class
 function exDetail(id){const x=exById(id);if(!x)return toast("Exercise no longer in library");
  const hist=[...sessions].filter(s=>s.ex.some(e=>e.exId===id)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
  const sec=(t,v)=>v?`<div class="lbl">${t}</div><div class="card" style="white-space:pre-wrap">${esc(v)}</div>`:"";
- const s=openSheet(x.name,`<div class="mu">${esc(x.group)}${x.rehab?" · rehab":""}</div>${howHTML(x)}${sec("INSTRUCTIONS",x.notes)}${sec("TIPS",x.tips)}${sec("SAFETY",x.safety)}
+ const s=openSheet(x.name,`<div class="mu">${esc(x.group)}${x.rehab?" · rehab":""}</div>${howHTML(x)}<div class="lbl">MACHINE TYPES &amp; PHOTOS</div><div id="ph-${esc(x.id)}"><div class="mu">Loading…</div></div>${sec("INSTRUCTIONS",x.notes)}${sec("TIPS",x.tips)}${sec("SAFETY",x.safety)}
  <div class="lbl">HISTORY</div>${hist.length?hist.map(h=>{const e=h.ex.find(e=>e.exId===id);return`<div class="card"><b>${dmy(h.date)}</b> <span class="mu">${esc(h.day)}</span><div class="mu">${e.sets.map(t=>(t.w??"–")+" kg × "+(t.r??"–")).join(" · ")}</div></div>`}).join(""):'<div class="mu">Not logged yet.</div>'}`,'<button class="sm" id="xe">Edit</button>');
- s.querySelector("#xe").onclick=()=>{s.remove();exEdit(id)}}
+ s.querySelector("#xe").onclick=()=>{s.remove();exEdit(id)};drawPhotos(x)}
 function exEdit(id){const x=id?exById(id):{id:null,name:"",group:"Other",rehab:false,pose:"",notes:"",tips:"",safety:""};
  const poses=Object.keys(HOW).sort();
  const s=openSheet(id?"Edit exercise":"New exercise",`<label>Name<input id="fN" value="${esc(x.name)}" maxlength="60"></label>
@@ -344,6 +345,38 @@ function pickExercise(cb){const s=openSheet("Add exercise",`<input type="search"
  const draw=()=>{const q=s.querySelector("#pq").value.toLowerCase();s.querySelector("#pl").innerHTML=lib.filter(x=>!q||x.name.toLowerCase().includes(q)).map(x=>`<div class="li" data-p="${esc(x.id)}" role="button"><div class="ico">${esc(x.name[0])}</div><div><b>${esc(x.name)}</b><div class="mu">${esc(x.group)}</div></div><span style="color:var(--ac);font-size:24px">＋</span></div>`).join("");
   s.querySelectorAll("[data-p]").forEach(r=>r.onclick=()=>{s.remove();cb(r.dataset.p)})};
  s.querySelector("#pq").oninput=draw;draw()}
+
+// ---- Machine types & photos (IndexedDB) ----
+const TYPES={"chest-press-machine":["Seated (selectorised)","Plate-loaded","Converging/ISO-lateral"],"incline-db-press":["Adjustable bench + DBs","Smith machine","Incline press machine"],"pec-deck-cable-fly":["Pec deck","Cable crossover","Dual adjustable pulley"],
+"goblet-squat":["Dumbbell","Kettlebell","Plate"],"leg-press":["45° Leg Press","Horizontal/Seated Leg Press","Vertical Leg Press"],"romanian-deadlift":["Barbell","Dumbbells","Trap bar","Smith machine"],
+"leg-curl":["Seated leg curl","Lying leg curl","Standing leg curl","Cable"],"calf-raise":["Standing calf machine","Seated calf machine","Leg press","Bodyweight step"],
+"lat-pulldown":["Cable stack","Plate-loaded","Assisted"],"seated-cable-row":["Cable row station","Plate-loaded row","Dual cable"],"chest-supported-row":["T-bar (chest pad)","Plate-loaded row","Incline bench + DBs"],
+"shoulder-press-machine":["Selectorised","Plate-loaded","Smith machine"],"lateral-raise":["Dumbbell","Cable","Lateral raise machine"],"face-pull":["Cable + rope","Band"],
+"incline-push-up":["Bench","Smith bar","Wall/rail"],"inverted-row":["Smith bar","TRX/rings","Fixed bar"],"seated-leg-extension":["Leg extension machine","Ankle weight","Band"],"slow-low-step-ups":["Low step/box","Aerobic step","Bodyweight"]};
+function typesOf(x){const base=TYPES[x.id]||(x.rehab?["Band","Dumbbell","Cable"]:/Calisthenics|Core/.test(x.group)?["Bodyweight","Mat","Rail/support"]:["Machine","Cable","Dumbbell","Bodyweight"]);return[...new Set([...base,...(x.types||[])])]}
+let _db;function db(){return _db||(_db=new Promise((ok,no)=>{const r=indexedDB.open("gymPhotos",1);r.onupgradeneeded=()=>r.result.createObjectStore("photos",{keyPath:"id"}).createIndex("exId","exId");r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}))}
+async function tx(mode,f){const d=await db();return new Promise((ok,no)=>{const t=d.transaction("photos",mode),s=t.objectStore("photos");let out;const r=f(s);if(r)r.onsuccess=()=>out=r.result;t.oncomplete=()=>ok(out);t.onerror=()=>no(t.error)})}
+const photosOf=exId=>tx("readonly",s=>s.index("exId").getAll(exId));
+const allPhotos=()=>tx("readonly",s=>s.getAll());
+const putPhoto=p=>tx("readwrite",s=>s.put(p));const delPhoto=id=>tx("readwrite",s=>s.delete(id));
+function compress(file){return new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",.72))};im.onerror=()=>no(new Error("Could not read image"));im.src=u})}
+function pickPhoto(cam){return new Promise(ok=>{const i=document.createElement("input");i.type="file";i.accept="image/*";if(cam)i.setAttribute("capture","environment");i.onchange=()=>ok(i.files[0]||null);i.click()})}
+async function addPhoto(x,type,cam){const f=await pickPhoto(cam);if(!f)return;let src;try{src=await compress(f)}catch(e){return alert(e.message)}
+ const label=(prompt("Label for this "+type+" photo (e.g. 'blue Hammer Strength by the window')","")||"").trim();
+ await putPhoto({id:uid(),exId:x.id,type,label,src,ts:new Date().toISOString()});toast("Photo saved ✓");drawPhotos(x)}
+async function drawPhotos(x){const box=document.getElementById("ph-"+x.id);if(!box)return;
+ const types=typesOf(x);let ps=[];try{ps=await photosOf(x.id)}catch(e){box.innerHTML='<div class="mu">Photos unavailable in this browser.</div>';return}
+ const groups=[...new Set([...types,...ps.map(p=>p.type)])];
+ box.innerHTML=`<div class="mu">Tap a type to take a photo.</div><div class="tg">${types.map(t=>`<button class="ghost" data-ty="${esc(t)}">📷 ${esc(t)}</button>`).join("")}<button class="sm" id="tyO">+ Other type</button></div>
+ <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="tyG" style="width:24px;min-height:24px"> Choose from gallery instead of camera</label>
+ ${groups.filter(g=>ps.some(p=>p.type===g)).map(g=>`<div class="lbl">${esc(g.toUpperCase())}</div><div class="pg">${ps.filter(p=>p.type===g).map(p=>`<figure><img src="${p.src}" alt="${esc(p.label)}" data-pv="${p.id}"><figcaption>${esc(p.label||"No label")}</figcaption><div class="row"><button class="sm" data-pe="${p.id}">✏️</button><button class="d" data-pd="${p.id}">🗑</button></div></figure>`).join("")}</div>`).join("")||'<div class="mu" style="margin-top:8px">No photos yet.</div>'}`;
+ const gal=()=>box.querySelector("#tyG").checked;
+ box.querySelectorAll("[data-ty]").forEach(b=>b.onclick=()=>addPhoto(x,b.dataset.ty,!gal()));
+ box.querySelector("#tyO").onclick=()=>{const t=(prompt("New machine type for "+x.name)||"").trim();if(!t)return;x.types=[...new Set([...(x.types||[]),t])];saveLib();drawPhotos(x);addPhoto(x,t,!gal())};
+ const P=id=>ps.find(p=>p.id===id);
+ box.querySelectorAll("[data-pe]").forEach(b=>b.onclick=async()=>{const p=P(b.dataset.pe),l=prompt("Edit label",p.label||"");if(l===null)return;p.label=l.trim();await putPhoto(p);drawPhotos(x)});
+ box.querySelectorAll("[data-pd]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this photo?"))return;await delPhoto(b.dataset.pd);toast("Photo deleted");drawPhotos(x)});
+ box.querySelectorAll("[data-pv]").forEach(im=>im.onclick=()=>{const p=P(im.dataset.pv);openSheet(p.type,`<img src="${p.src}" style="width:100%;border-radius:12px"><div style="margin-top:8px">${esc(p.label||"")}</div><div class="mu">${dmy(p.ts.slice(0,10))}</div>`)})}
 
 // ---- Template editor ----
 function editTpl(id){const orig=id?tpl.find(t=>t.id===id):null;const t=orig?JSON.parse(JSON.stringify(orig)):{id:"t"+uid(),name:"New template",dow:"",group:"Other",note:"",items:[]};
@@ -383,7 +416,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Volume by muscle group</b><div style="height:240px"><canvas id="c2"></canvas></div></div>
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
- <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises and templates).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
+ <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
  chart("c0",{type:"bar",data:{labels,datasets:[{label:"Workouts",data:wk.map(w=>inW(w).length),backgroundColor:"#2f8cff"}]}});
@@ -391,10 +424,10 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  chart("c2",{type:"bar",data:{labels,datasets:groups.map((g,i)=>({label:g,backgroundColor:COLORS[i],data:wk.map(w=>Math.round(inW(w).filter(s=>s.group===g).reduce((a,s)=>a+vol(s),0)))}))},options:{scales:{x:{stacked:true,ticks:{color:"#8e8e93"}},y:{stacked:true,ticks:{color:"#8e8e93"},beginAtZero:true}}}});
  chart("c3",{type:"line",data:{labels,datasets:[{label:"Arm",data:wk.map(w=>avg(w,"armPain")),borderColor:"#ffb84f",spanGaps:true},{label:"Knee",data:wk.map(w=>avg(w,"kneePain")),borderColor:"#ff453a",spanGaps:true}]},options:{scales:{y:{min:0,max:10,ticks:{color:"#8e8e93"}},x:{ticks:{color:"#8e8e93"}}}}});
  chart("c4",{type:"line",data:{labels,datasets:rehab.map((x,i)=>({label:x.name.replace("Arm Rehab ",""),borderColor:COLORS[i%6],spanGaps:true,data:wk.map(w=>{const m=Math.max(0,...inW(w).flatMap(s=>s.ex.filter(e=>e.exId===x.id).flatMap(e=>e.sets.map(t=>t.w||0))));return m||null})}))}});
- $("#exJ").onclick=()=>download("gym-log-"+iso(new Date())+".json",JSON.stringify({app:"gym-log",version:2,sessions,weights,lib,tpl},null,2),"application/json");
+ $("#exJ").onclick=async()=>{let photos=[];try{photos=await allPhotos()}catch(e){}download("gym-log-"+iso(new Date())+".json",JSON.stringify({app:"gym-log",version:3,sessions,weights,lib,tpl,photos},null,2),"application/json")};
  $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
  $("#imJ").onclick=()=>$("#imF").click();
- $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
+ $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;if(Array.isArray(d.photos))for(const p of d.photos)await putPhoto(p);migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
  $("#rst").onclick=()=>{if(!confirm("Reset exercises and templates to the default program? Your logged workouts are kept; custom exercises and edits are removed."))return;lib=defLib();tpl=defTpl();saveLib();toast("Program reset ✓");renderProfile()};
  $("#pSave").onclick=async()=>{const o=$("#pOld").value,n=$("#pNew").value;if((await sha(o))!==pinHash())return alert("Current PIN is wrong");if(!/^\d{4}$/.test(n))return alert("New PIN must be 4 digits");if(n!==$("#pNew2").value)return alert("New PINs don't match");localStorage.setItem("gym.pinHash",await sha(n));toast("PIN changed ✓");renderProfile()};
  $("#lockNow").onclick=()=>{sessionStorage.removeItem("gym.unlocked");$("#lock").classList.remove("hid")};
