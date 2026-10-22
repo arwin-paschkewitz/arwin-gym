@@ -49,6 +49,8 @@ input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 .exb{margin:18px 0}.st{display:grid;grid-template-columns:30px 1fr 64px 64px 48px;gap:6px;align-items:center;padding:4px;border-radius:8px;margin-top:4px;text-align:center}
 .sb{padding:0;min-height:32px;height:32px;width:30px;flex:0 0 30px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:var(--card2);color:#fff;font-weight:700;font-size:14px}.sb.tW{color:#ff9f0a;background:rgba(255,159,10,.18)}.sb.tD{color:#bf5af2;background:rgba(191,90,242,.18)}.sb.tF{color:#ff453a;background:rgba(255,69,58,.18)}.stm button{display:flex;align-items:center;gap:12px;width:100%;margin-top:6px;text-align:left}.stm .sb{display:flex!important;justify-content:center!important;align-items:center!important;text-align:center!important;padding:0!important}.stm button.on{outline:2px solid var(--ac)}.tb{display:inline-block;min-width:16px;font-weight:700;margin-right:2px}.tb.tW{color:#ff9f0a}.tb.tD{color:#bf5af2}.tb.tF{color:#ff453a}
 .coach{background:rgba(47,140,255,.12);border:1px solid rgba(47,140,255,.4);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px;line-height:1.4}.ctip{background:var(--card2);border-radius:10px;padding:6px 10px;margin:6px 0;font-size:13px;line-height:1.4}.ctip summary{cursor:pointer;font-weight:700;color:var(--ac);padding:4px 0}.ctip .howCues{margin:4px 0 4px 18px}.cwarn{background:rgba(255,159,10,.15);border-left:3px solid #ff9f0a;color:#ffcc80;padding:5px 8px;border-radius:6px;margin:4px 0}
+.st.tm{grid-template-columns:30px 1fr 52px 68px 40px 44px}.st .sw{padding:0;min-height:40px;font-size:18px}
+#swS .swd{font:700 84px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-align:center;margin:28px 0 8px;letter-spacing:2px;font-variant-numeric:tabular-nums}#swS .swd.cd{color:var(--ac,#2f8cff)}#swS .swi{text-align:center;color:var(--mu);min-height:22px}#swS .swb{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}#swS .swb button{min-height:64px;font-size:20px}
 .st.hd{font-size:12px;color:var(--mu);font-weight:700}.st input{text-align:center;padding:6px 2px;min-height:40px}
 .st .ck{padding:0;min-height:40px}.st.dn{background:rgba(48,209,88,.16)}.st.dn .ck{background:var(--ok);color:#000}.st.dn input{background:transparent}
 .rest{position:fixed;left:0;right:0;bottom:0;background:var(--ac);color:#fff;display:flex;align-items:center;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));z-index:45;font-weight:700}
@@ -222,12 +224,18 @@ let lib=LS.get("gym.lib",null)||defLib(),tpl=LS.get("gym.tpl",null)||defTpl(),ac
 const saveLib=()=>{LS.set("gym.lib",lib);LS.set("gym.tpl",tpl)};
 const saveActive=()=>active?LS.set("gym.active",active):localStorage.removeItem("gym.active");
 const exById=id=>lib.find(x=>x.id===id);
+/* timed (duration) exercises: time stored as seconds in set.r, shown/typed as m:ss */
+const TIMED_DEF=new Set(["plank","side-plank","single-leg-stand"]);
+const isTimed=id=>{const x=exById(id);return x&&x.timed!=null?!!x.timed:TIMED_DEF.has(id)};
+const fmtS=v=>{if(v===""||v==null||isNaN(+v))return"";const n=Math.max(0,Math.round(+v));return Math.floor(n/60)+":"+String(n%60).padStart(2,"0")};
+function parseT(v){v=String(v??"").trim();if(!v)return"";let m=v.match(/^(\d+)\s*[:.,]\s*(\d{1,2})$/);if(m)return +m[1]*60+ +m[2];if(/^\d+$/.test(v))return v.length>=3?+v.slice(0,-2)*60+ +v.slice(-2):+v;return null}
+const rOut=(id,r)=>r==null||r===""?"–":isTimed(id)?fmtS(r):r;
 const exName=(id,fb)=>(exById(id)||{}).name||fb||id;
 function migrate(){let ch=0;sessions.forEach(s=>(s.ex||[]).forEach(e=>{if(!e.exId){const f=lib.find(x=>x.name===e.name)||exById(slug(e.name));e.exId=f?f.id:slug(e.name);ch=1}}));if(ch)save()}
 migrate();
 function prevSets(exId,skipId){const l=[...sessions].filter(s=>s.id!==skipId).sort((a,b)=>b.date.localeCompare(a.date)||String(b.saved).localeCompare(String(a.saved)));
  for(const s of l){const e=s.ex.find(x=>x.exId===exId);if(e&&e.sets.some(t=>t.w!=null||t.r!=null))return e.sets}return[]}
-const vol=s=>s.ex.reduce((a,e)=>a+e.sets.reduce((b,t)=>b+((t.w||0)*(t.r||0)),0),0);
+const vol=s=>s.ex.reduce((a,e)=>isTimed(e.exId)?a:a+e.sets.reduce((b,t)=>b+((t.w||0)*(t.r||0)),0),0);
 
 // ---- Sheets (stacked full-screen pages) ----
 function openSheet(title,body,right=""){const s=document.createElement("div");s.className="sheet";s.innerHTML=`<div class="shh"><button class="sm" data-close>✕</button><b>${esc(title)}</b><div>${right}</div></div><div class="shb">${body}</div>`;document.body.appendChild(s);s.querySelector("[data-close]").onclick=()=>s.remove();return s}
@@ -297,10 +305,10 @@ let restEnd=0,restDur=90,tick=null;
 function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList.remove("hid");updResume();
  let h=`<div class="awh"><button class="sm" id="awMin" aria-label="Minimise">⌄</button><div class="awt" id="awT"></div><button class="ok" id="awFin">${a.id?"Save":"Finish"}</button></div><div class="awb">
  <input class="ttl" id="awName" value="${esc(a.name)}" aria-label="Workout name"><input type="date" id="awDate" value="${a.date}" style="margin-top:4px">${a.note?`<div class="mu" style="margin-top:6px">ℹ️ ${esc(a.note)}</div>`:""}${coachBox(a.tplName||a.name)}`;
- a.ex.forEach((e,i)=>{const x=exById(e.exId)||{name:e.name||e.exId};const prev=prevSets(e.exId,a.id);
+ a.ex.forEach((e,i)=>{const x=exById(e.exId)||{name:e.name||e.exId};const prev=prevSets(e.exId,a.id),tm=isTimed(e.exId);
   h+=`<div class="exb ${x.rehab?"rehab":""}" style="${x.rehab?"padding-left:8px":""}"><div class="rowb"><div class="exn"><button class="lnk" data-xd="${esc(e.exId)}">${esc(x.name)} ⓘ</button><button class="cam" data-cam="${esc(e.exId)}" aria-label="Machine photos"><i class="ce">📷</i><span class="cb hid"></span></button></div><div class="mv"><button class="sm" data-up="${i}" aria-label="Move up">▲</button><button class="sm" data-dn="${i}" aria-label="Move down">▼</button><button class="d" data-rx="${i}" aria-label="Remove">✕</button></div></div>${e.target?`<div class="mu">Target ${e.sets.length} × ${esc(e.target)}${x.rehab?" · rehab, keep light":""}</div>`:""}${exTipHTML(x.name,a.tplName||a.name)}
-  <div class="st hd"><span>SET</span><span>PREVIOUS</span><span>KG</span><span>REPS</span><span>✓</span></div>`;
-  e.sets.forEach((s,j)=>{const p=prev[j];h+=`<div class="st ${s.done?"dn":""}" data-i="${i}" data-j="${j}"><button class="sb t${tCode(s.type)}" data-sb aria-label="Set type">${tCode(s.type)==="N"?j+1:tCode(s.type)}</button><span class="mu">${p&&(p.w!=null||p.r!=null)?(p.w??"–")+" × "+(p.r??"–"):"–"}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="iw" value="${s.w??""}" placeholder="${p&&p.w!=null?p.w:""}"><input type="number" inputmode="numeric" min="0" class="ir" value="${s.r??""}" placeholder="${p&&p.r!=null?p.r:""}"><button class="ck" aria-label="Done">✓</button></div><div class="rl ${restOf(e,s)?"":"off"}" data-ri="${i}" data-rj="${j}"><span class="rf"></span><button class="rt" data-rt="${i},${j}">${restOf(e,s)?fmtT(restOf(e,s)*1000):"Off"}</button></div>`});
+  ${tm?`<div class="st hd tm"><span>SET</span><span>PREVIOUS</span><span>KG</span><span>TIME</span><span>⏱</span><span>✓</span></div>`:`<div class="st hd"><span>SET</span><span>PREVIOUS</span><span>KG</span><span>REPS</span><span>✓</span></div>`}`;
+  e.sets.forEach((s,j)=>{const p=prev[j];h+=`<div class="st ${tm?"tm ":""}${s.done?"dn":""}" data-i="${i}" data-j="${j}"><button class="sb t${tCode(s.type)}" data-sb aria-label="Set type">${tCode(s.type)==="N"?j+1:tCode(s.type)}</button><span class="mu">${p&&(p.w!=null||p.r!=null)?(p.w??"–")+" × "+rOut(e.exId,p.r):"–"}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="iw" value="${s.w??""}" placeholder="${p&&p.w!=null?p.w:""}">${tm?`<input type="text" inputmode="decimal" class="ir it" value="${esc(fmtS(s.r))}" placeholder="${p&&p.r!=null?fmtS(p.r):"m:ss"}" aria-label="Time (m:ss)" autocomplete="off"><button class="sw ghost" data-sw aria-label="Stopwatch">⏱</button>`:`<input type="number" inputmode="numeric" min="0" class="ir" value="${s.r??""}" placeholder="${p&&p.r!=null?p.r:""}">`}<button class="ck" aria-label="Done">✓</button></div><div class="rl ${restOf(e,s)?"":"off"}" data-ri="${i}" data-rj="${j}"><span class="rf"></span><button class="rt" data-rt="${i},${j}">${restOf(e,s)?fmtT(restOf(e,s)*1000):"Off"}</button></div>`});
   h+=`<div class="row" style="margin-top:6px"><button class="ghost" data-as="${i}">+ Add Set (${exRest(e)?fmtT(exRest(e)*1000):"Off"})</button>${e.sets.length?`<button class="ghost" data-rs="${i}">− Set</button>`:""}</div></div>`});
  h+=`<button class="w ghost" id="awAdd">+ Add exercises</button>
  <div class="card"><label>Arm pain: <b id="apv">${a.armPain}</b>/10<input type="range" min="0" max="10" id="ap" value="${a.armPain}"></label><label>Knee pain: <b id="kpv">${a.kneePain}</b>/10<input type="range" min="0" max="10" id="kp" value="${a.kneePain}"></label><label>Notes<textarea id="notes">${esc(a.notes)}</textarea></label>
@@ -325,8 +333,12 @@ function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList
  at("[data-up]",b=>{const i=+b.dataset.up;if(i>0){[a.ex[i-1],a.ex[i]]=[a.ex[i],a.ex[i-1]];saveActive();renderActive()}});
  at("[data-dn]",b=>{const i=+b.dataset.dn;if(i<a.ex.length-1){[a.ex[i+1],a.ex[i]]=[a.ex[i],a.ex[i+1]];saveActive();renderActive()}});
  m.querySelectorAll(".st[data-i]").forEach(r=>{const s=a.ex[+r.dataset.i].sets[+r.dataset.j],iw=r.querySelector(".iw"),ir=r.querySelector(".ir");
-  iw.oninput=()=>{s.w=iw.value;saveActive()};ir.oninput=()=>{s.r=ir.value;saveActive()};
-  r.querySelector(".ck").onclick=()=>{if(!s.done){if(s.w===""&&iw.placeholder){s.w=iw.value=iw.placeholder}if(s.r===""&&ir.placeholder){s.r=ir.value=ir.placeholder}unlockAudio();startRest(+r.dataset.i,+r.dataset.j)}else if(restAt&&restAt[0]==+r.dataset.i&&restAt[1]==+r.dataset.j){restEnd=0;restAt=null}s.done=!s.done;r.classList.toggle("dn",s.done);saveActive();tickFn()}});
+  iw.oninput=()=>{s.w=iw.value;saveActive()};
+  if(ir.classList.contains("it")){const pv=()=>{const v=parseT(ir.value);if(v===null){ir.style.outline="2px solid #ff453a";return null}ir.style.outline="";return v};
+   ir.oninput=()=>{const v=pv();if(v!==null){s.r=v===""?"":v;saveActive()}};ir.onchange=()=>{const v=pv();if(v!==null)ir.value=fmtS(v)};
+   const swb=r.querySelector("[data-sw]");if(swb)swb.onclick=()=>stopwatch(+r.dataset.i,+r.dataset.j)}
+  else ir.oninput=()=>{s.r=ir.value;saveActive()};
+  r.querySelector(".ck").onclick=()=>{if(!s.done){if(s.w===""&&iw.placeholder){s.w=iw.value=iw.placeholder}if(s.r===""&&ir.placeholder){if(ir.classList.contains("it")){const v=parseT(ir.placeholder);if(v){s.r=v;ir.value=fmtS(v)}}else s.r=ir.value=ir.placeholder}unlockAudio();startRest(+r.dataset.i,+r.dataset.j)}else if(restAt&&restAt[0]==+r.dataset.i&&restAt[1]==+r.dataset.j){restEnd=0;restAt=null}s.done=!s.done;r.classList.toggle("dn",s.done);saveActive();tickFn()}});
  at("[data-rt]",b=>{const[i,j]=b.dataset.rt.split(",").map(Number);restPicker(i,j)});
  tickFn()}
 /* update text in place without inserting nodes */
@@ -393,10 +405,10 @@ function finishWorkout(){const a=active;
 
 // ---- Send to Coach ----
 const COACH="arwin-gym@mail.grokbot.com";
-function lastTime(s,e){const p=sessions.filter(h=>h.id!==s.id&&(h.date<s.date||h.date===s.date&&String(h.saved)<String(s.saved))&&h.ex.some(x=>x.exId===e.exId)).sort((a,b)=>b.date.localeCompare(a.date)||String(b.saved).localeCompare(String(a.saved)))[0];if(!p)return"";const x=p.ex.find(x=>x.exId===e.exId);return`  Last time (${dmy(p.date)}): ${x.sets.map(t=>`${t.w??"–"}x${t.r??"–"}`).join(", ")}`}
+function lastTime(s,e){const p=sessions.filter(h=>h.id!==s.id&&(h.date<s.date||h.date===s.date&&String(h.saved)<String(s.saved))&&h.ex.some(x=>x.exId===e.exId)).sort((a,b)=>b.date.localeCompare(a.date)||String(b.saved).localeCompare(String(a.saved)))[0];if(!p)return"";const x=p.ex.find(x=>x.exId===e.exId);return`  Last time (${dmy(p.date)}): ${x.sets.map(t=>`${t.w??"–"}x${rOut(e.exId,t.r)}`).join(", ")}`}
 function coachText(s,onlyDone,noLast){const L=[`Date: ${DAYS[s.dow]} ${dmy(s.date)}`,`Duration: ${s.dur?fmtT(s.dur):"–"}`,`Total volume: ${Math.round(vol(s)).toLocaleString()} kg`,...(onlyDone?["(completed sets only)"]:[]),""];
  s.ex.forEach(e=>{const st=e.sets.map((t,i)=>[t,i]).filter(([t])=>!onlyDone||t.done!==false);if(onlyDone&&!st.length)return;L.push(exName(e.exId,e.name));const lt=noLast?"":lastTime(s,e);if(lt)L.push(lt);
-  st.forEach(([t,i])=>L.push(`  ${i+1}. ${t.type||"Normal"} ${t.w??"–"} kg x ${t.r??"–"} ${t.done===false?"[not ticked]":t.done?"[ticked]":"[logged]"}`))});
+  st.forEach(([t,i])=>L.push(`  ${i+1}. ${t.type||"Normal"} ${t.w??"–"} kg x ${rOut(e.exId,t.r)} ${t.done===false?"[not ticked]":t.done?"[ticked]":"[logged]"}`))});
  L.push("",`Arm pain: ${s.armPain}/10`,`Knee pain: ${s.kneePain}/10`,`Notes: ${s.notes||"–"}`);return L.join("\n")}
 function coachURL(s){const sub=`Workout: ${s.day} ${dmy(s.date)}`,mk=b=>`mailto:${COACH}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(b)}`;let u=mk(coachText(s,false));
  if(u.length>1800)u=mk(coachText(s,false,true));
@@ -411,7 +423,7 @@ function renderHistory(){
  if(!list.length){$("#v-history").innerHTML='<div class="card mu">No workouts yet. Start one from the Workout tab.</div>';return}
  $("#v-history").innerHTML=`<div class="mu">${list.length} workouts</div>`+list.map(s=>`<div class="card"><div class="rowb"><b>${esc(s.day)}</b><span class="mu">${DAYS[s.dow]} ${dmy(s.date)}</span></div>
  <div class="mu">${s.dur?"⏱ "+fmtT(s.dur)+" · ":""}🏋️ ${Math.round(vol(s)).toLocaleString()} kg · Arm ${s.armPain}/10 · Knee ${s.kneePain}/10</div>
- <table style="margin-top:6px"><tr><th>Exercise</th><th>Best set</th></tr>${s.ex.map(e=>{const b=[...e.sets].sort((x,y)=>(y.w||0)*(y.r||0)-(x.w||0)*(x.r||0)||(y.r||0)-(x.r||0))[0]||{};return`<tr><td>${e.sets.length} × ${esc(exName(e.exId,e.name))}${e.sets.some(t=>t.type)?`<div class="mu" style="font-size:12px">${e.sets.map(tBadge).join(" ")}</div>`:""}</td><td>${b.w??"–"} kg × ${b.r??"–"}</td></tr>`}).join("")}</table>
+ <table style="margin-top:6px"><tr><th>Exercise</th><th>Best set</th></tr>${s.ex.map(e=>{const b=[...e.sets].sort(isTimed(e.exId)?(x,y)=>(y.r||0)-(x.r||0):(x,y)=>(y.w||0)*(y.r||0)-(x.w||0)*(x.r||0)||(y.r||0)-(x.r||0))[0]||{};return`<tr><td>${e.sets.length} × ${esc(exName(e.exId,e.name))}${e.sets.some(t=>t.type)?`<div class="mu" style="font-size:12px">${e.sets.map(tBadge).join(" ")}</div>`:""}</td><td>${b.w??"–"} kg × ${rOut(e.exId,b.r)}</td></tr>`}).join("")}</table>
  ${s.notes?`<div class="mu">📝 ${esc(s.notes)}</div>`:""}<div class="row" style="margin-top:8px"><button class="ghost" data-e="${s.id}">✏️ Edit</button><button class="ghost" data-cs="${s.id}">📧 Send to Coach</button><button class="d" data-x="${s.id}">🗑 Delete</button></div></div>`).join("");
  $("#v-history").querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>sendCoach(sessions.find(x=>x.id===b.dataset.cs)));
  $("#v-history").querySelectorAll("[data-e]").forEach(b=>b.onclick=()=>editSession(b.dataset.e));
@@ -478,7 +490,7 @@ const tCode=t=>(STYPES.find(x=>x[0]===t)||STYPES[0])[1];
 const tBadge=(t,i)=>{const c=tCode(t&&t.type);return`<span class="tb t${c}">${c==="N"?i+1:c}</span>`};
 function setTypeMenu(s0,j){const sh=openSheet("Set "+(j+1)+" type",`<div class="stm">${STYPES.map(([n,c,d])=>`<button class="ghost ${(s0.type||"Normal")===n?"on":""}" data-ty="${n}"><span class="sb t${c}">${c==="N"?j+1:c}</span><span><b>${n}</b><div class="mu" style="font-size:12px">${d}</div></span></button>`).join("")}</div>`);
  sh.querySelectorAll("[data-ty]").forEach(b=>b.onclick=()=>{if(b.dataset.ty==="Normal")delete s0.type;else s0.type=b.dataset.ty;saveActive();sh.remove();const sc=[$("#aw"),$("#aw .awb")].map(e=>e?e.scrollTop:0);renderActive();[$("#aw"),$("#aw .awb")].forEach((e,k)=>{if(e)e.scrollTop=sc[k]})})}
-function exDetail(id,tab){const x=exById(id);if(!x)return toast("Exercise no longer in library");
+function exDetail(id,tab){const x=exById(id);if(!x)return toast("Exercise no longer in library");const TM=isTimed(id);
  const s=openSheet(x.name,`<div class="seg" role="tablist">${["About","History","Charts","Records"].map(t=>`<button role="tab" data-tab="${t}">${t}</button>`).join("")}</div><div id="xdb"></div>`,'<button class="sm" id="xe">Edit</button>');
  s.querySelector("#xe").onclick=()=>{s.remove();exEdit(id)};
  const body=s.querySelector("#xdb");let ch=[];
@@ -490,8 +502,12 @@ function exDetail(id,tab){const x=exById(id);if(!x)return toast("Exercise no lon
    ${tips.length?`<h3 class="h3">Tips</h3><ul class="howCues">${tips.map(c=>`<li>${esc(c)}</li>`).join("")}</ul>`:""}
    ${x.safety?`<h3 class="h3">Safety</h3><div class="card" style="white-space:pre-wrap">${esc(x.safety)}</div>`:""}
    ${coachTips?`<div style="margin-top:10px">${exTipHTML(x.name,"",true)}</div>`:""}${stickHTML(x)}<div class="lbl">MACHINE TYPES &amp; PHOTOS</div><div id="ph-${esc(x.id)}"><div class="mu">Loading…</div></div>`;drawPhotos(x)}
-  else if(t==="History"){body.innerHTML=L.length?[...L].reverse().map(({s:h,e})=>`<div class="card"><div class="rowb"><b>${esc(h.day)}</b><span class="mu">${DAYS[h.dow]} ${dmy(h.date)}</span></div><table style="margin-top:6px"><tr><th>Set</th><th>kg × reps</th><th>Est. 1RM</th></tr>${e.sets.map((t,i)=>`<tr><td>${tBadge(t,i)}</td><td>${t.w??"–"} × ${t.r??"–"}</td><td>${t.w&&t.r&&t.type!=="Warm-up"?e1rm(t).toFixed(1):"–"}</td></tr>`).join("")}</table></div>`).join(""):'<div class="card mu" style="margin-top:10px">Not logged yet.</div>'}
+  else if(t==="History"){body.innerHTML=L.length?[...L].reverse().map(({s:h,e})=>`<div class="card"><div class="rowb"><b>${esc(h.day)}</b><span class="mu">${DAYS[h.dow]} ${dmy(h.date)}</span></div><table style="margin-top:6px"><tr><th>Set</th><th>${TM?"kg × time":"kg × reps"}</th><th>${TM?"":"Est. 1RM"}</th></tr>${e.sets.map((t,i)=>`<tr><td>${tBadge(t,i)}</td><td>${t.w??"–"} × ${rOut(x.id,t.r)}</td><td>${TM?"":t.w&&t.r&&t.type!=="Warm-up"?e1rm(t).toFixed(1):"–"}</td></tr>`).join("")}</table></div>`).join(""):'<div class="card mu" style="margin-top:10px">Not logged yet.</div>'}
   else if(t==="Charts"){if(!L.length){body.innerHTML='<div class="card mu" style="margin-top:10px">Log this exercise to see charts.</div>';return}
+   if(TM){body.innerHTML=`${window.Chart?"":'<div class="card mu">Charts need internet once to load.</div>'}<div class="card"><b>Longest hold (m:ss)</b><div style="height:200px"><canvas id="xc1"></canvas></div></div><div class="card"><b>Total time per session (m:ss)</b><div style="height:200px"><canvas id="xc2"></canvas></div></div>`;
+    if(!window.Chart)return;const lab=L.map(o=>dmy(o.s.date).slice(0,5)),tk={color:"#8e8e93",callback:v=>fmtS(v)},opt={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtS(c.parsed.y)}}},scales:{x:{ticks:{color:"#8e8e93"},grid:{color:"#2a2a2c"}},y:{ticks:tk,grid:{color:"#2a2a2c"},beginAtZero:true}}};
+    const mk=(cid,type,data,col)=>ch.push(new Chart(body.querySelector(cid),{type,data:{labels:lab,datasets:[{data,borderColor:col,backgroundColor:col,spanGaps:true,tension:.25}]},options:opt}));
+    mk("#xc1","line",L.map(o=>Math.max(0,...o.e.sets.filter(t=>t.type!=="Warm-up").map(t=>+t.r||0))||null),"#ffb84f");mk("#xc2","bar",L.map(o=>o.e.sets.reduce((a,t)=>a+(+t.r||0),0)),"#2f8cff");return}
    body.innerHTML=`${window.Chart?"":'<div class="card mu">Charts need internet once to load.</div>'}<div class="card"><b>Best set weight (kg)</b><div style="height:200px"><canvas id="xc1"></canvas></div></div><div class="card"><b>Estimated 1RM (kg)</b><div style="height:200px"><canvas id="xc2"></canvas></div></div><div class="card"><b>Volume (kg × reps)</b><div style="height:200px"><canvas id="xc3"></canvas></div></div><div class="card"><b>Best reps</b><div style="height:200px"><canvas id="xc4"></canvas></div></div>`;
    if(!window.Chart)return;const lab=L.map(o=>dmy(o.s.date).slice(0,5)),opt={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#8e8e93"},grid:{color:"#2a2a2c"}},y:{ticks:{color:"#8e8e93"},grid:{color:"#2a2a2c"},beginAtZero:true}}};
    const mk=(cid,type,data,col)=>ch.push(new Chart(body.querySelector(cid),{type,data:{labels:lab,datasets:[{data,borderColor:col,backgroundColor:col,spanGaps:true,tension:.25}]},options:opt}));
@@ -500,8 +516,8 @@ function exDetail(id,tab){const x=exById(id);if(!x)return toast("Exercise no lon
   else{const all=L.flatMap(({s:h,e})=>e.sets.filter(t=>t.type!=="Warm-up").map(t=>({t,d:h.date})));
    const best=f=>all.reduce((m,o)=>f(o.t)>(m?f(m.t):0)?o:m,null);
    const sv=L.reduce((m,o)=>{const v=o.e.sets.filter(t=>t.type!=="Warm-up").reduce((a,t)=>a+(t.w||0)*(t.r||0),0);return v>(m?m.v:0)?{v,d:o.s.date}:m},null);
-   const rows=[["Heaviest weight",best(t=>t.w||0),o=>`${o.t.w} kg × ${o.t.r??"–"}`],["Best estimated 1RM",best(e1rm),o=>`${e1rm(o.t).toFixed(1)} kg`],["Most reps in a set",best(t=>t.r||0),o=>`${o.t.r} reps @ ${o.t.w??0} kg`],["Best set volume",best(t=>(t.w||0)*(t.r||0)),o=>`${(o.t.w||0)*(o.t.r||0)} kg`]];
-   body.innerHTML=all.length?`<div class="card">${rows.map(([n,o,f])=>`<div class="rowb rec"><div><b>${n}</b>${o?`<div class="mu">${dmy(o.d)}</div>`:""}</div><div>${o?f(o):"–"}</div></div>`).join("")}<div class="rowb rec"><div><b>Best session volume</b>${sv?`<div class="mu">${dmy(sv.d)}</div>`:""}</div><div>${sv?Math.round(sv.v)+" kg":"–"}</div></div><div class="rowb rec"><div><b>Times logged</b></div><div>${L.length}</div></div></div>`:'<div class="card mu" style="margin-top:10px">No records yet.</div>'}};
+   const rows=TM?[["Longest hold",best(t=>+t.r||0),o=>`${fmtS(o.t.r)}${o.t.w?` @ ${o.t.w} kg`:""}`],["Heaviest weight",best(t=>t.w||0),o=>`${o.t.w} kg × ${fmtS(o.t.r)||"–"}`],["Most time in a session",(()=>{const m=L.reduce((m,o)=>{const v=o.e.sets.filter(t=>t.type!=="Warm-up").reduce((a,t)=>a+(+t.r||0),0);return v>(m?m.v:0)?{v,d:o.s.date}:m},null);return m&&{t:{r:m.v},d:m.d}})(),o=>fmtS(o.t.r)]]:[["Heaviest weight",best(t=>t.w||0),o=>`${o.t.w} kg × ${o.t.r??"–"}`],["Best estimated 1RM",best(e1rm),o=>`${e1rm(o.t).toFixed(1)} kg`],["Most reps in a set",best(t=>t.r||0),o=>`${o.t.r} reps @ ${o.t.w??0} kg`],["Best set volume",best(t=>(t.w||0)*(t.r||0)),o=>`${(o.t.w||0)*(o.t.r||0)} kg`]];
+   body.innerHTML=all.length?`<div class="card">${rows.map(([n,o,f])=>`<div class="rowb rec"><div><b>${n}</b>${o?`<div class="mu">${dmy(o.d)}</div>`:""}</div><div>${o?f(o):"–"}</div></div>`).join("")}${TM?"":`<div class="rowb rec"><div><b>Best session volume</b>${sv?`<div class="mu">${dmy(sv.d)}</div>`:""}</div><div>${sv?Math.round(sv.v)+" kg":"–"}</div></div>`}<div class="rowb rec"><div><b>Times logged</b></div><div>${L.length}</div></div></div>`:'<div class="card mu" style="margin-top:10px">No records yet.</div>'}};
  s.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>go(b.dataset.tab));go(tab||"About")}
 function exEdit(id){const x=id?exById(id):{id:null,name:"",group:"Other",rehab:false,pose:"",notes:"",tips:"",safety:""};
  const poses=Object.keys(HOW).sort();
@@ -509,12 +525,13 @@ function exEdit(id){const x=id?exById(id):{id:null,name:"",group:"Other",rehab:f
  <label>Muscle group<select id="fG">${[...new Set([...GROUPS,x.group])].map(g=>`<option ${g===x.group?"selected":""}>${esc(g)}</option>`).join("")}</select></label>
  <label>Diagram<select id="fP"><option value="">No diagram</option>${poses.map(p=>`<option value="${esc(p)}" ${p===x.pose?"selected":""}>${esc(p)}</option>`).join("")}</select></label>
  <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="fR" ${x.rehab?"checked":""} style="width:24px;min-height:24px"> Rehab exercise (keep light)</label>
+ <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="fTm" ${(x.id?isTimed(x.id):!!x.timed)?"checked":""} style="width:24px;min-height:24px"> Timed exercise (log time as m:ss, with stopwatch)</label>
  <label>Instructions (one step per line; leave empty for the default steps)<textarea id="fI">${esc(x.notes)}</textarea></label><label>Tips<textarea id="fT">${esc(x.tips)}</textarea></label><label>Safety notes<textarea id="fS">${esc(x.safety)}</textarea></label>
  ${id?"":`<label>Add to template (day)<select id="fD"><option value="">Don't add</option>${tpl.map(t=>`<option value="${t.id}">${esc(tplLabel(t))}</option>`).join("")}</select></label><div class="row"><label>Sets<input type="number" id="fSe" value="3" inputmode="numeric"></label><label>Reps<input id="fRe" value="10"></label></div>`}
  <button class="p w" id="fSave">Save</button>${id?'<button class="d w" id="fDel">🗑 Delete exercise</button>':""}`);
  const q=k=>s.querySelector(k);
  q("#fSave").onclick=()=>{const n=q("#fN").value.trim();if(!n)return alert("Enter a name");if(lib.some(y=>y.id!==x.id&&y.name.toLowerCase()===n.toLowerCase()))return alert("An exercise with that name already exists");
-  const o={name:n,group:q("#fG").value,pose:q("#fP").value,rehab:q("#fR").checked,notes:q("#fI").value,tips:q("#fT").value,safety:q("#fS").value};
+  const o={name:n,group:q("#fG").value,pose:q("#fP").value,rehab:q("#fR").checked,timed:q("#fTm").checked,notes:q("#fI").value,tips:q("#fT").value,safety:q("#fS").value};
   if(id)Object.assign(x,o);else{const nid=slug(n)+"-"+uid().slice(-4);lib.push(Object.assign({id:nid,def:0},o));const t=tpl.find(t=>t.id===q("#fD").value);if(t)t.items.push({exId:nid,sets:+q("#fSe").value||3,reps:q("#fRe").value||"10"})}
   saveLib();s.remove();toast("Saved ✓");if(!$("#aw").classList.contains("hid"))renderActive();show(view)};
  if(id)q("#fDel").onclick=()=>{if(!confirm("Delete "+x.name+"? It will be removed from all templates. Past logs are kept."))return;lib=lib.filter(y=>y.id!==id);tpl.forEach(t=>t.items=t.items.filter(i=>i.exId!==id));saveLib();s.remove();toast("Deleted");show(view)}}
@@ -538,6 +555,38 @@ const allPhotos=()=>tx("readonly",s=>s.getAll());
 const putPhoto=p=>tx("readwrite",s=>s.put(p));const delPhoto=id=>tx("readwrite",s=>s.delete(id));
 function compress(file){return new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",.72))};im.onerror=()=>no(new Error("Could not read image"));im.src=u})}
 let photoIn=null;
+/* stopwatch for timed sets: timestamp-based, digits-only updates, wake lock */
+function swTarget(e){const t=tipEx(exName(e.exId,e.name),active&&(active.tplName||active.name));const src=[t&&t.target,e.target];
+ for(const v of src){if(v==null)continue;const str=String(v);let m=str.match(/(\d+):(\d{2})/);if(m)return +m[1]*60+ +m[2];m=str.match(/(\d+)(?:\s*[-–]\s*(\d+))?\s*(?:s|sec|secs|seconds)\b/i);if(m)return +(m[2]||m[1]);m=str.match(/(\d+)\s*(?:min|mins|minutes)\b/i);if(m)return +m[1]*60}return 0}
+function stopwatch(i,j){const e=active.ex[i],set=e.sets[j];if(!e||!set)return;const tg=swTarget(e);let acc=0,from=0,cdEnd=0,iv=null,wl=null,lastMin=0,tgHit=false,lastCd=0;
+ const cdOn=LS.get("gym.swCd",true);
+ const s=openSheet("⏱ "+exName(e.exId,e.name)+" · Set "+(j+1),`<div id="swS"><div class="swd" id="swD">0:00.0</div><div class="swi" id="swI">${tg?"Target "+fmtS(tg)+" · buzz at target":"Buzz every minute"}${restSound==="off"?" (sound off in Profile)":""}</div>
+ <div class="swb"><button class="ok" id="swGo">Start</button><button class="ghost" id="swR">Reset</button></div><button class="p w" id="swDone" style="margin-top:10px;min-height:60px;font-size:20px">Done – use this time</button>
+ <label style="display:flex;gap:10px;align-items:center;margin-top:14px"><input type="checkbox" id="swC" ${cdOn?"checked":""} style="width:24px;min-height:24px"> 3-2-1 countdown before start</label></div>`);
+ const D=s.querySelector("#swD"),go=s.querySelector("#swGo"),I=s.querySelector("#swI");
+ const el=()=>acc+(from?Date.now()-from:0);
+ const show=ms=>{const t=Math.floor(ms/100),sec=Math.floor(t/10);setTx(D,Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0")+"."+(t%10))};
+ const lock=async()=>{try{if(navigator.wakeLock&&!wl){wl=await navigator.wakeLock.request("screen");wl.addEventListener("release",()=>{wl=null})}}catch(x){}};
+ const unlock=()=>{try{wl&&wl.release()}catch(x){}wl=null};
+ const loop=()=>{const now=Date.now();
+  if(cdEnd){const left=cdEnd-now;if(left>0){const n=Math.ceil(left/1000);setTx(D,String(n));if(n!==lastCd){lastCd=n}return}cdEnd=0;D.classList.remove("cd");from=now;}
+  if(!from)return;const ms=el();show(ms);
+  if(tg){if(!tgHit&&ms>=tg*1000){tgHit=true;beep();setTx(I,"Target "+fmtS(tg)+" reached 💪")}}
+  else{const mn=Math.floor(ms/60000);if(mn>lastMin){lastMin=mn;beep()}}};
+ const setBtn=()=>{setTx(go,from||cdEnd?"Pause":acc?"Resume":"Start");go.className=from||cdEnd?"d":"ok"};
+ const stop=()=>{if(from){acc+=Date.now()-from;from=0}cdEnd=0;D.classList.remove("cd");show(acc);setBtn()};
+ go.onclick=()=>{unlockAudio();if(from||cdEnd){stop();unlock();return}
+  lock();if(!iv)iv=setInterval(loop,100);
+  if(!acc&&s.querySelector("#swC").checked){cdEnd=Date.now()+3000;lastCd=0;D.classList.add("cd")}else from=Date.now();setBtn();loop()};
+ s.querySelector("#swR").onclick=()=>{from=0;cdEnd=0;acc=0;lastMin=0;tgHit=false;D.classList.remove("cd");show(0);setBtn();unlock();if(tg)setTx(I,"Target "+fmtS(tg)+" · buzz at target")};
+ s.querySelector("#swC").onchange=ev=>LS.set("gym.swCd",ev.target.checked);
+ const onVis=()=>{if(!document.hidden&&(from||cdEnd)){lock();loop()}};document.addEventListener("visibilitychange",onVis);
+ const close=()=>{clearInterval(iv);iv=null;unlock();document.removeEventListener("visibilitychange",onVis);s.remove()};
+ s.querySelector("[data-close]").onclick=close;
+ s.querySelector("#swDone").onclick=()=>{stop();const sec=Math.round(acc/1000);close();if(!sec)return;set.r=sec;saveActive();
+  const row=document.querySelector(`#aw .st[data-i="${i}"][data-j="${j}"]`);if(!row){renderActive();return}const ir=row.querySelector(".ir");if(ir)ir.value=fmtS(sec);
+  if(!set.done)row.querySelector(".ck").click();else toast("Time updated: "+fmtS(sec))};
+ setBtn()}
 function pickPhoto(cam){return new Promise(ok=>{/* one persistent input attached to <body>, outside any re-rendered DOM */
  if(!photoIn){photoIn=document.createElement("input");photoIn.type="file";photoIn.accept="image/*";photoIn.id="photoIn";photoIn.setAttribute("aria-hidden","true");photoIn.tabIndex=-1;photoIn.style.cssText="position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0";document.body.appendChild(photoIn)}
  const i=photoIn;i.value="";if(cam)i.setAttribute("capture","environment");else i.removeAttribute("capture");
