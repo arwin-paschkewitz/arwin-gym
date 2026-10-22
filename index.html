@@ -329,13 +329,17 @@ function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList
   r.querySelector(".ck").onclick=()=>{if(!s.done){if(s.w===""&&iw.placeholder){s.w=iw.value=iw.placeholder}if(s.r===""&&ir.placeholder){s.r=ir.value=ir.placeholder}unlockAudio();startRest(+r.dataset.i,+r.dataset.j)}else if(restAt&&restAt[0]==+r.dataset.i&&restAt[1]==+r.dataset.j){restEnd=0;restAt=null}s.done=!s.done;r.classList.toggle("dn",s.done);saveActive();tickFn()}});
  at("[data-rt]",b=>{const[i,j]=b.dataset.rt.split(",").map(Number);restPicker(i,j)});
  tickFn()}
-function tickFn(){const t=$("#awT");if(active){const txt=active.id?"Editing":fmtT(Date.now()-active.start);if(t)t.textContent=txt;$("#rbT").textContent=txt}
+/* update text in place without inserting nodes */
+function setTx(el,v){if(!el||el.textContent===v)return;const n=el.firstChild;if(n&&n.nodeType===3&&!n.nextSibling)n.nodeValue=v;else el.textContent=v}
+function tickFn(){const t=$("#awT");if(active){const txt=active.id?"Editing":fmtT(Date.now()-active.start);setTx(t,txt);setTx($("#rbT"),txt)}
  const r=$("#rest");if(!r)return;const left=restEnd-Date.now();
- if(left>0&&active){r.classList.remove("hid");r.innerHTML=`<span>Rest</span><b>${fmtT(left)}</b><button id="rm">−15</button><button id="rp">+15</button><button id="rk">Skip</button>`;
+ if(left>0&&active){r.classList.remove("hid");/* build once; per tick only update text (iOS cancels taps when timers insert nodes) */
+  if(!r.querySelector("#rk")){r.innerHTML=`<span>Rest</span><b></b><button id="rm">−15</button><button id="rp">+15</button><button id="rk">Skip</button>`;
   $("#rm").onclick=()=>{restEnd-=15000;tickFn()};$("#rp").onclick=()=>{restEnd+=15000;restTot=Math.max(restTot,restEnd-Date.now());tickFn()};$("#rk").onclick=()=>{restEnd=0;restAt=null;tickFn()}}
+  const rbx=r.querySelector("b"),lt=fmtT(left);setTx(rbx,lt)}
  else{if(restEnd&&left<=0){restDone()}restEnd=0;r.classList.add("hid")}
  document.querySelectorAll("#aw .rl.live").forEach(l=>{if(!(restAt&&restEnd&&+l.dataset.ri===restAt[0]&&+l.dataset.rj===restAt[1])){l.classList.remove("live");const e=active&&active.ex[+l.dataset.ri],s2=e&&e.sets[+l.dataset.rj];if(s2){const v=restOf(e,s2);l.querySelector(".rt").textContent=v?fmtT(v*1000):"Off"}l.querySelector(".rf").style.width=""}});
- if(restAt&&restEnd&&left>0){const l=document.querySelector(`#aw .rl[data-ri="${restAt[0]}"][data-rj="${restAt[1]}"]`);if(l){l.classList.add("live");l.querySelector(".rt").textContent=fmtT(left);l.querySelector(".rf").style.width=Math.max(0,Math.min(100,left/restTot*100))+"%"}}}
+ if(restAt&&restEnd&&left>0){const l=document.querySelector(`#aw .rl[data-ri="${restAt[0]}"][data-rj="${restAt[1]}"]`);if(l){l.classList.add("live");const rt=l.querySelector(".rt"),ft=fmtT(left);setTx(rt,ft);l.querySelector(".rf").style.width=Math.max(0,Math.min(100,left/restTot*100))+"%"}}}
 let restAt=null,restTot=1,actx=null;
 const exRest=e=>e.rest!=null?+e.rest:restDur;
 const restOf=(e,s)=>s&&s.rest!=null?+s.rest:exRest(e);
@@ -516,7 +520,12 @@ const photosOf=exId=>tx("readonly",s=>s.index("exId").getAll(exId));
 const allPhotos=()=>tx("readonly",s=>s.getAll());
 const putPhoto=p=>tx("readwrite",s=>s.put(p));const delPhoto=id=>tx("readwrite",s=>s.delete(id));
 function compress(file){return new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",.72))};im.onerror=()=>no(new Error("Could not read image"));im.src=u})}
-function pickPhoto(cam){return new Promise(ok=>{const i=document.createElement("input");i.type="file";i.accept="image/*";if(cam)i.setAttribute("capture","environment");i.onchange=()=>ok(i.files[0]||null);i.click()})}
+let photoIn=null;
+function pickPhoto(cam){return new Promise(ok=>{/* one persistent input attached to <body>, outside any re-rendered DOM */
+ if(!photoIn){photoIn=document.createElement("input");photoIn.type="file";photoIn.accept="image/*";photoIn.id="photoIn";photoIn.setAttribute("aria-hidden","true");photoIn.tabIndex=-1;photoIn.style.cssText="position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0";document.body.appendChild(photoIn)}
+ const i=photoIn;i.value="";if(cam)i.setAttribute("capture","environment");else i.removeAttribute("capture");
+ let done=false;const fin=f=>{if(done)return;done=true;i.onchange=null;i.oncancel=null;ok(f)};
+ i.onchange=()=>fin(i.files[0]||null);i.oncancel=()=>fin(null);i.click()})}
 async function addPhoto(x,type,cam){const f=await pickPhoto(cam);if(!f)return;let src;try{src=await compress(f)}catch(e){return alert(e.message)}
  const label=(prompt("Label for this "+type+" photo (e.g. 'blue Hammer Strength by the window')","")||"").trim();
  await putPhoto({id:uid(),exId:x.id,type,label,src,ts:new Date().toISOString()});toast("Photo saved ✓");drawPhotos(x)}
