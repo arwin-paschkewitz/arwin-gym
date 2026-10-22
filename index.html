@@ -346,7 +346,7 @@ function setTx(el,v){if(!el||el.textContent===v)return;const n=el.firstChild;if(
 function tickFn(){const t=$("#awT");if(active){const txt=active.id?"Editing":fmtT(Date.now()-active.start);setTx(t,txt);setTx($("#rbT"),txt)}
  const r=$("#rest");if(!r)return;const left=restEnd-Date.now();
  if(left>0&&active){r.classList.remove("hid");/* build once; per tick only update text (iOS cancels taps when timers insert nodes) */
-  if(!r.querySelector("#rk")){r.innerHTML=`<span>Rest</span><b></b><button id="rm">−15</button><button id="rp">+15</button><button id="rk">Skip</button>`;
+  if(!r.querySelector("#rk")){r.innerHTML=`<span>Rest</span><b></b><button id="rm">−15</button><button id="rp">+15</button>${phoneT?`<button id="rpt" title="Start iPhone timer">⏱</button>`:""}<button id="rk">Skip</button>`;if($("#rpt"))$("#rpt").onclick=()=>phoneTimer((restEnd-Date.now())/1000);
   $("#rm").onclick=()=>{restEnd-=15000;tickFn()};$("#rp").onclick=()=>{restEnd+=15000;restTot=Math.max(restTot,restEnd-Date.now());tickFn()};$("#rk").onclick=()=>{restEnd=0;restAt=null;tickFn()}}
   const rbx=r.querySelector("b"),lt=fmtT(left);setTx(rbx,lt)}
  else{if(restEnd&&left<=0){restDone()}restEnd=0;r.classList.add("hid")}
@@ -355,7 +355,7 @@ function tickFn(){const t=$("#awT");if(active){const txt=active.id?"Editing":fmt
 let restAt=null,restTot=1,actx=null;
 const exRest=e=>e.rest!=null?+e.rest:restDur;
 const restOf=(e,s)=>s&&s.rest!=null?+s.rest:exRest(e);
-function startRest(i,j){if(restSound==="buzz")vibNote();const e=active.ex[i],v=restOf(e,e.sets[j]);if(!v){restEnd=0;restAt=null;return}restTot=v*1000;restEnd=Date.now()+restTot;restAt=[i,j]}
+function startRest(i,j){if(restSound==="buzz")vibNote();const e=active.ex[i],v=restOf(e,e.sets[j]);if(!v){restEnd=0;restAt=null;return}restTot=v*1000;restEnd=Date.now()+restTot;restAt=[i,j];if(phoneT)phoneTimer(v)}
 function unlockAudio(){try{primeAudio()}catch(e){}try{if(actx&&actx.state==="closed")actx=null;actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state!=="running"){actx._u=0;const p=actx.resume();if(pendSound&&p&&p.then)p.then(()=>{if(pendSound&&actx.state==="running"&&Date.now()-restOverTs<120000){pendSound=false;const k=pendKind;pendKind=null;k?playTones(k):beep()}},()=>{})}if(!actx._u){actx._u=1;const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}}catch(e){}}
 let restSound=LS.get("gym.sound","buzz"),pendSound=false,pendKind=null,restOverTs=0;
 /* Alert sound via <audio> (media playback ignores the iPhone silent switch); Web Audio is the fallback */
@@ -379,6 +379,18 @@ function playWA(kind){unlockAudio();if(!actx)return;const go=()=>{try{const t0=a
  let ran=false;const run=()=>{if(ran||actx.state!=="running")return;ran=true;go()};
  try{actx.resume().then(run,()=>{})}catch(e){}setTimeout(()=>{if(!ran){pendSound=true;pendKind=kind}},400)}
 function beep(){if(restSound==="off")return;playTones(restSound==="beep"?"beep":"buzz")}
+/* Phone timer alert: runs the user's "Gym Rest" iOS Shortcut, which starts a Clock timer (rings in background / on lock screen) */
+let phoneT=LS.get("gym.phoneT",false);
+function phoneTimer(sec){sec=Math.round(sec);if(!(sec>0))return;location.href="shortcuts://run-shortcut?name=Gym%20Rest&input=text&text="+sec}
+function phoneHelp(){openSheet("Phone timer setup",`<div class="card"><b>One-time setup on your iPhone (about 2 min)</b><ol style="padding-left:20px;line-height:1.6">
+<li>Open the <b>Shortcuts</b> app → tap <b>+</b> (new shortcut).</li>
+<li>Tap the name at the top → <b>Rename</b> → type exactly <b>Gym Rest</b>.</li>
+<li>Tap <b>Add Action</b>, search <b>Get Numbers from Input</b>, add it. It should read <i>Get numbers from Shortcut Input</i> (if it says something else, tap that blue word and choose <b>Shortcut Input</b>).</li>
+<li>Search <b>Start Timer</b>, add it. Tap the number field → choose the <b>Numbers</b> variable (above the keyboard). Tap the unit and choose <b>seconds</b> (default is minutes!).</li>
+<li>Tap <b>Done</b>. Run it once from the Shortcuts app and tap <b>Allow</b> if it asks for Clock/Siri access.</li>
+<li>Back here, turn on <b>Phone timer alert</b>. When rest starts, iPhone opens Shortcuts for a moment and starts a Clock timer; tap <b>◀ Gym Log</b> (top-left) to come back. The Clock timer rings even when the app is in the background or the phone is locked.</li></ol>
+<div class="mu">Tip: if you change rest with −15/+15, tap ⏱ on the rest bar to restart the phone timer with the time left (it replaces the running timer). Skip doesn't stop the Clock timer; dismiss it on the phone. Don't add an "Open URL" action back to the app: it would open Safari, not the Home Screen app.</div></div>
+<button class="w" id="phTest">▶ Test: 10 s timer</button>`).querySelector("#phTest").onclick=()=>phoneTimer(10)}
 function vibNote(){if(!navigator.vibrate&&!LS.get("gym.vibNote",false)){LS.set("gym.vibNote",true);alert("Note: Safari on iPhone can't vibrate, so Buzz plays a loud buzz sound instead. Keep your volume up.")}}
 function restDone(){restAt=null;restOverTs=Date.now();if(navigator.vibrate)navigator.vibrate([350,150,350,150,350]);if(document.hidden)pendSound=true;else beep();const ago=restEnd?Math.round((Date.now()-restEnd)/1000):0;toast(ago>2?"Rest over "+(ago<60?ago+"s":Math.round(ago/60)+" min")+" ago 💪":"Rest over 💪")}
 document.addEventListener("pointerdown",unlockAudio,{capture:true,passive:true});document.addEventListener("touchend",unlockAudio,{capture:true,passive:true});
@@ -653,7 +665,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
  <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
- <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
+ <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
  chart("c0",{type:"bar",data:{labels,datasets:[{label:"Workouts",data:wk.map(w=>inW(w).length),backgroundColor:"#2f8cff"}]}});
@@ -664,6 +676,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  $("#exJ").onclick=async()=>{let photos=[];try{photos=await allPhotos()}catch(e){}download("gym-log-"+iso(new Date())+".json",JSON.stringify({app:"gym-log",version:3,sessions,weights,lib,tpl,photos},null,2),"application/json")};
  document.querySelectorAll("#sndSeg [data-snd]").forEach(b=>b.onclick=()=>{restSound=b.dataset.snd;if(restSound==="buzz")vibNote();LS.set("gym.sound",restSound);document.querySelectorAll("#sndSeg [data-snd]").forEach(x=>x.classList.toggle("on",x===b))});
  $("#askC").onchange=e=>LS.set("gym.askCoach",e.target.checked);
+ $("#phT").onchange=e=>{phoneT=e.target.checked;LS.set("gym.phoneT",phoneT);const r=$("#rest");if(r)r.innerHTML="";if(phoneT&&!LS.get("gym.phHelpSeen",false)){LS.set("gym.phHelpSeen",true);phoneHelp()}};$("#phHelp").onclick=phoneHelp;
  $("#sndTest").onclick=()=>{unlockAudio();vibNote();playTones(restSound==="beep"?"beep":"buzz")};
  $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
  $("#imJ").onclick=()=>$("#imF").click();
