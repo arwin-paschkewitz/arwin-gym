@@ -344,17 +344,21 @@ let restAt=null,restTot=1,actx=null;
 const exRest=e=>e.rest!=null?+e.rest:restDur;
 const restOf=(e,s)=>s&&s.rest!=null?+s.rest:exRest(e);
 function startRest(i,j){const e=active.ex[i],v=restOf(e,e.sets[j]);if(!v){restEnd=0;restAt=null;return}restTot=v*1000;restEnd=Date.now()+restTot;restAt=[i,j]}
-function unlockAudio(){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state!=="running")actx.resume();if(!actx._u){actx._u=1;const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}}catch(e){}}
-let restSound=LS.get("gym.sound","buzz"),pendSound=false;
+function unlockAudio(){try{if(actx&&actx.state==="closed")actx=null;actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state!=="running"){actx._u=0;const p=actx.resume();if(pendSound&&p&&p.then)p.then(()=>{if(pendSound&&actx.state==="running"&&Date.now()-restOverTs<120000){pendSound=false;const k=pendKind;pendKind=null;k?playTones(k):beep()}},()=>{})}if(!actx._u){actx._u=1;const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}}catch(e){}}
+let restSound=LS.get("gym.sound","buzz"),pendSound=false,pendKind=null,restOverTs=0;
 function playTones(kind){unlockAudio();if(!actx)return;const go=()=>{try{const t0=actx.currentTime+.03,m=actx.createDynamicsCompressor?actx.createDynamicsCompressor():null,out=m||actx.destination;if(m)m.connect(actx.destination);
  if(kind==="beep"){[0,.25,.5].forEach(t=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.setValueAtTime(.0001,t0+t);g.gain.exponentialRampToValueAtTime(.4,t0+t+.02);g.gain.exponentialRampToValueAtTime(.0001,t0+t+.18);o.connect(g).connect(out);o.start(t0+t);o.stop(t0+t+.2)});return}
  [0,.55,1.1].forEach(t=>{const g=actx.createGain();g.gain.setValueAtTime(0,t0+t);g.gain.linearRampToValueAtTime(.9,t0+t+.01);g.gain.setValueAtTime(.9,t0+t+.33);g.gain.linearRampToValueAtTime(0,t0+t+.35);g.connect(out);
   [["sawtooth",180],["square",183]].forEach(([ty,f])=>{const o=actx.createOscillator();o.type=ty;o.frequency.value=f;const og=actx.createGain();og.gain.value=.5;o.connect(og).connect(g);o.start(t0+t);o.stop(t0+t+.36)})})}catch(e){}};
- if(actx.state!=="running")actx.resume().then(go,go);else go()}
+ if(actx.state==="running")return go();
+ /* iOS: after app switch / call / YouTube the context is "interrupted" and resume() only succeeds inside a tap; retry on next touch instead of failing silently */
+ let ran=false;const run=()=>{if(ran||actx.state!=="running")return;ran=true;go()};
+ try{actx.resume().then(run,()=>{})}catch(e){}setTimeout(()=>{if(!ran){pendSound=true;pendKind=kind}},400)}
 function beep(){if(restSound==="off")return;playTones(restSound==="beep"?"beep":"buzz")}
-function restDone(){restAt=null;if(navigator.vibrate)navigator.vibrate([350,150,350,150,350]);if(document.hidden)pendSound=true;else beep();toast("Rest over 💪")}
+function restDone(){restAt=null;restOverTs=Date.now();if(navigator.vibrate)navigator.vibrate([350,150,350,150,350]);if(document.hidden)pendSound=true;else beep();const ago=restEnd?Math.round((Date.now()-restEnd)/1000):0;toast(ago>2?"Rest over "+(ago<60?ago+"s":Math.round(ago/60)+" min")+" ago 💪":"Rest over 💪")}
 document.addEventListener("pointerdown",unlockAudio,{capture:true,passive:true});document.addEventListener("touchend",unlockAudio,{capture:true,passive:true});
-document.addEventListener("visibilitychange",()=>{if(document.hidden)return;unlockAudio();if(pendSound){pendSound=false;beep()}});
+document.addEventListener("visibilitychange",()=>{if(document.hidden)return;unlockAudio();tickFn();/* end time is a timestamp, so this fires at once on return */
+ if(pendSound){pendSound=false;beep()}});
 setInterval(()=>{if(actx&&actx.state==="suspended"&&restEnd&&!document.hidden)actx.resume().catch(()=>{})},2000);
 function restPicker(i,j){const e=active.ex[i],s0=e.sets[j];let v=restOf(e,s0);
  const sh=openSheet("Rest timer · "+exName(e.exId)+" set "+(j+1),`<div class="rpv" id="rpv"></div><div class="row"><button class="ghost" id="rpm">−15s</button><button class="ghost" id="rpp">+15s</button></div>
