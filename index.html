@@ -8,8 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gym Log">
 <title>Arwin's Gym Log</title>
-<link rel="manifest" id="mf">
-<link rel="apple-touch-icon" id="ati">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<link rel="icon" href="img/icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#000;--card:#1c1c1e;--card2:#2c2c2e;--tx:#f2f2f7;--mu:#8e8e93;--ac:#2f8cff;--ok:#30d158;--bad:#ff453a;--r:14px}
@@ -355,7 +356,7 @@ function tickFn(){const t=$("#awT");if(active){const txt=active.id?"Editing":fmt
 let restAt=null,restTot=1,actx=null;
 const exRest=e=>e.rest!=null?+e.rest:restDur;
 const restOf=(e,s)=>s&&s.rest!=null?+s.rest:exRest(e);
-function startRest(i,j){if(restSound==="buzz")vibNote();const e=active.ex[i],v=restOf(e,e.sets[j]);if(!v){restEnd=0;restAt=null;return}restTot=v*1000;restEnd=Date.now()+restTot;restAt=[i,j];if(phoneT)phoneTimer(v)}
+function startRest(i,j){if(restSound==="buzz")vibNote();const e=active.ex[i],v=restOf(e,e.sets[j]);if(!v){restEnd=0;restAt=null;return}restTot=v*1000;restEnd=Date.now()+restTot;restAt=[i,j];pushSync();if(phoneT)phoneTimer(v)}
 function unlockAudio(){try{primeAudio()}catch(e){}try{if(actx&&actx.state==="closed")actx=null;actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state!=="running"){actx._u=0;const p=actx.resume();if(pendSound&&p&&p.then)p.then(()=>{if(pendSound&&actx.state==="running"&&Date.now()-restOverTs<120000){pendSound=false;const k=pendKind;pendKind=null;k?playTones(k):beep()}},()=>{})}if(!actx._u){actx._u=1;const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}}catch(e){}}
 let restSound=LS.get("gym.sound","buzz"),pendSound=false,pendKind=null,restOverTs=0;
 /* Alert sound via <audio> (media playback ignores the iPhone silent switch); Web Audio is the fallback */
@@ -665,7 +666,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
  <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
- <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
+ <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div style="margin-top:12px"><b>Lock-screen notification</b><div class="mu" id="pushSt" style="margin:4px 0"></div><button class="w" id="pushBtn"></button></div><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
  chart("c0",{type:"bar",data:{labels,datasets:[{label:"Workouts",data:wk.map(w=>inW(w).length),backgroundColor:"#2f8cff"}]}});
@@ -677,6 +678,8 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  document.querySelectorAll("#sndSeg [data-snd]").forEach(b=>b.onclick=()=>{restSound=b.dataset.snd;if(restSound==="buzz")vibNote();LS.set("gym.sound",restSound);document.querySelectorAll("#sndSeg [data-snd]").forEach(x=>x.classList.toggle("on",x===b))});
  $("#askC").onchange=e=>LS.set("gym.askCoach",e.target.checked);
  $("#phT").onchange=e=>{phoneT=e.target.checked;LS.set("gym.phoneT",phoneT);const r=$("#rest");if(r)r.innerHTML="";if(phoneT&&!LS.get("gym.phHelpSeen",false)){LS.set("gym.phHelpSeen",true);phoneHelp()}};$("#phHelp").onclick=phoneHelp;
+ const pst=()=>{$("#pushSt").textContent=!PUSH_API?"Coming soon: the notification server isn't set up yet.":pushOn?"On ✓ — you'll get a notification when rest ends, even with the app closed or phone locked.":/iPhone|iPad/.test(navigator.userAgent)&&!isStandalone()?"Needs the Home Screen app: Share → Add to Home Screen, then open Gym Log from the icon.":"Off. Sends a notification when rest ends, even in the background (iOS 16.4+ Home Screen app).";$("#pushBtn").textContent=pushOn?"Turn off notifications":"🔔 Turn on notifications";$("#pushBtn").disabled=!PUSH_API};pst();
+ $("#pushBtn").onclick=async()=>{if(pushOn){pushOff();pst();return}try{await pushEnable();toast("Notifications on ✓ (test sent)")}catch(e){pushOn=false;LS.set("gym.pushOn",false);alert(e.message)}pst()};
  $("#sndTest").onclick=()=>{unlockAudio();vibNote();playTones(restSound==="beep"?"beep":"buzz")};
  $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
  $("#imJ").onclick=()=>$("#imF").click();
@@ -696,17 +699,30 @@ function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
  $("#bwT").querySelectorAll("[data-bw]").forEach(b=>b.onclick=()=>{weights=weights.filter(x=>x.date!==b.dataset.bw);save();renderMeasure()});
 }
 
-// ---- PWA manifest (inline) ----
-(function(){const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#000"/><text x="256" y="330" font-size="280" text-anchor="middle">🏋️</text></svg>`;
- const icon="data:image/svg+xml,"+encodeURIComponent(svg);const base=location.href.replace(/[#?].*$/,"");
- const m={name:"Arwin's Gym Log",short_name:"Gym Log",start_url:base,scope:base.replace(/[^/]*$/,""),display:"standalone",background_color:"#000000",theme_color:"#000000",icons:[{src:icon,sizes:"512x512",type:"image/svg+xml",purpose:"any"}]};
- $("#mf").href="data:application/manifest+json,"+encodeURIComponent(JSON.stringify(m));$("#ati").href=icon})();
+// ---- Web Push: lock-screen notification when rest ends (server schedules it; see gym-push worker) ----
+const PUSH_API="",VAPID_PUB="BBK5wW67JXkDm6iKC3laXBiaICi3j4GOiWVw58sXVw06G4P4O6coV6-ihSGszyrKv5JSVyIDJc4vLnWzDuUkcXc";
+let pushOn=LS.get("gym.pushOn",false),pushLast=0;
+const pushDev=()=>{let d=LS.get("gym.pushId","");if(!d){d=[...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,"0")).join("");LS.set("gym.pushId",d)}return d};
+const isStandalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+const pushOK=()=>"serviceWorker"in navigator&&"PushManager"in window&&"Notification"in window;
+function pushPost(path,j){if(!PUSH_API)return Promise.reject(new Error("no server"));return fetch(PUSH_API.replace(/\/$/,"")+"/"+path,{method:"POST",keepalive:true,headers:{"Content-Type":"application/json"},body:JSON.stringify({id:pushDev(),...j})})}
+function pushSync(){if(!pushOn||!PUSH_API)return;const now=Date.now(),t=active&&restEnd>now?restEnd:0;if(t===pushLast)return;
+ const sub=LS.get("gym.pushSub",null);if(t&&sub)pushPost("schedule",{sub,at:t}).catch(()=>{});else if(!t&&pushLast>now+1000)pushPost("cancel",{}).catch(()=>{});pushLast=t}
+async function pushEnable(){if(!pushOK())throw new Error(/iPhone|iPad/.test(navigator.userAgent)&&!isStandalone()?"Add Gym Log to your Home Screen first, then open it from there.":"This browser doesn't support push notifications.");
+ if(!PUSH_API)throw new Error("Notification server isn't set up yet.");
+ const reg=await navigator.serviceWorker.register("sw.js",{scope:"./"});await navigator.serviceWorker.ready;
+ const perm=await Notification.requestPermission();if(perm!=="granted")throw new Error("Notifications not allowed. iPhone: Settings → Notifications → Gym Log → Allow.");
+ const k=Uint8Array.from(atob(VAPID_PUB.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
+ const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:k});
+ LS.set("gym.pushSub",sub.toJSON());pushOn=true;LS.set("gym.pushOn",true);pushLast=0;const r=await pushPost("test",{sub:sub.toJSON()});if(!r.ok)throw new Error("Server test failed ("+r.status+")")}
+function pushOff(){if(pushLast>Date.now())pushPost("cancel",{}).catch(()=>{});pushOn=false;LS.set("gym.pushOn",false);pushLast=0}
+if(pushOn&&pushOK())navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(()=>{});
 
 restDur=LS.get("gym.rest",90);
 buildPad();
 if(sessionStorage.getItem("gym.unlocked")==="1")$("#lock").classList.add("hid");
 if(!window.isSecureContext||!crypto.subtle){$("#pinErr").textContent="PIN check unavailable on this connection; app unlocked.";$("#lock").classList.add("hid")}
-tick=setInterval(tickFn,250);
+tick=setInterval(()=>{tickFn();pushSync()},250);
 show("workout");loadTips().then(()=>{if(active&&!$("#aw").classList.contains("hid"))renderActive()});
 if(active)renderActive();
 </script></body></html>
