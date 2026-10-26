@@ -1,0 +1,3 @@
+Exercise demo frames in this folder come from yuhonas/free-exercise-db
+(https://github.com/yuhonas/free-exercise-db), released under the Unlicense (public domain).
+Resized to 240px wide WebP. Not affiliated with Strong.
