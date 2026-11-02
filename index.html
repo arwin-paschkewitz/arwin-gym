@@ -292,7 +292,7 @@ function previewTpl(id){const t=tpl.find(x=>x.id===id);
  const s=openSheet(tplLabel(t),`${t.note?`<div class="card mu">ℹ️ ${esc(t.note)}</div>`:""}${t.items.map(i=>`<div class="li"><div class="ico">${esc(exName(i.exId)[0]||"?")}</div><div><b>${esc(exName(i.exId))}</b><div class="mu">${i.sets} × ${esc(i.reps)}</div></div></div>`).join("")}<button class="p w" id="go">Start workout</button>`);
  s.querySelector("#go").onclick=()=>{s.remove();startWorkout(t)}}
 function startWorkout(t){if(active&&!confirm("Discard the workout in progress and start a new one?"))return;loadTips().then(()=>{if(active&&document.querySelector("#aw:not(.hid)"))renderActive()});
- active={id:null,start:Date.now(),date:iso(new Date()),tplId:t?t.id:null,name:t?t.name:"Workout",tplName:t?t.name:"",dow:t&&t.dow!=null&&t.dow!==""?+t.dow:new Date().getDay(),group:t?t.group:"Other",note:t?t.note:"",
+ unlockAudio();playCue("wStart");active={id:null,start:Date.now(),date:iso(new Date()),tplId:t?t.id:null,name:t?t.name:"Workout",tplName:t?t.name:"",dow:t&&t.dow!=null&&t.dow!==""?+t.dow:new Date().getDay(),group:t?t.group:"Other",note:t?t.note:"",
   ex:t?t.items.filter(i=>exById(i.exId)).map(i=>{const ct=coachRest(tipEx((exById(i.exId)||{}).name,t.name)),rs=i.rest!=null&&i.rest!==""?+i.rest:(ct||restDur);return{exId:i.exId,target:i.reps,rest:rs,sets:Array.from({length:+i.sets||1},()=>({w:"",r:"",done:false,rest:rs}))}}):[],armPain:0,kneePain:0,notes:""};
  saveActive();renderActive()}
 
@@ -401,7 +401,7 @@ let restSaid=false,sayOn=LS.get("gym.sayOn",true),sayTxt=LS.get("gym.sayTxt","Ge
 function auVoice(){const v=speechSynthesis.getVoices();return v.find(x=>/en[-_]AU/i.test(x.lang))||v.find(x=>/^en/i.test(x.lang))||null}
 function unlockSpeech(){if(spUnl||!window.speechSynthesis)return;spUnl=true;try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u)}catch(e){}}
 document.addEventListener("touchend",unlockSpeech,{once:true});document.addEventListener("click",unlockSpeech,{once:true});
-function sayReady(){if(!sayOn||restSound==="off"||document.hidden)return;const t=(sayTxt||"").trim()||"Get ready fatty";
+function sayReady(){if(!cueMode._skip&&!document.hidden&&playCue("ready10"))return;if(!sayOn||restSound==="off"||document.hidden)return;const t=(sayTxt||"").trim()||"Get ready fatty";
  if(!window.speechSynthesis||!window.SpeechSynthesisUtterance)return playTones("beep");
  try{if(audMode==="loud")setSession();else duckFor(3500);speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t),v=auVoice();u.lang=v?v.lang:"en-AU";try{if(v)u.voice=v}catch(e){}u.rate=1;u.volume=1;
   let ok=false;u.onstart=()=>ok=true;u.onend=()=>{if(audMode==="duck")duckFor(300)};u.onerror=()=>{if(!ok)safePlay("beep")};speechSynthesis.speak(u);setTimeout(()=>{if(!ok&&!speechSynthesis.speaking)safePlay("beep")},1500)}catch(e){safePlay("beep")}}
@@ -422,6 +422,51 @@ function playWA(kind){unlockAudio();if(!actx)return;const go=()=>{try{const t0=a
  /* iOS: after app switch / call / YouTube the context is "interrupted" and resume() only succeeds inside a tap; retry on next touch instead of failing silently */
  let ran=false;const run=()=>{if(ran||actx.state!=="running")return;ran=true;go()};
  try{actx.resume().then(run,()=>{})}catch(e){}setTimeout(()=>{if(!ran){pendSound=true;pendKind=kind}},400)}
+
+/* ---- Custom audio cues: clips in IndexedDB, played via Web Audio at 1.5x gain + limiter (same path as buzzer); <audio> fallback; default sound if anything fails ---- */
+const CUES=[["ready10","10 seconds left on rest","Spoken phrase"],["restEnd","Rest timer finished","Buzzer / beep"],["cd321","3-2-1 countdown (stopwatch)","None"],["wStart","Workout started","None"],["wFinish","Workout finished","None"]];
+let cueMode=LS.get("gym.cueMode",{}),cueBuf={},cueUrl={},_cdb;
+function cueDB(){return _cdb||(_cdb=new Promise((ok,no)=>{const r=indexedDB.open("gymCues",1);r.onupgradeneeded=()=>r.result.createObjectStore("clips",{keyPath:"id"});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}))}
+async function cueGet(id){const d=await cueDB();return new Promise((ok,no)=>{const q=d.transaction("clips").objectStore("clips").get(id);q.onsuccess=()=>ok(q.result||null);q.onerror=()=>no(q.error)})}
+async function cuePut(id,blob,name){const d=await cueDB();return new Promise((ok,no)=>{const t=d.transaction("clips","readwrite");t.objectStore("clips").put({id,blob,type:blob.type,name:name||"",ts:Date.now()});t.oncomplete=()=>ok();t.onerror=()=>no(t.error)})}
+async function cueDel(id){const d=await cueDB();return new Promise(ok=>{const t=d.transaction("clips","readwrite");t.objectStore("clips").delete(id);t.oncomplete=()=>ok();t.onerror=()=>ok()})}
+function decodeBuf(ab){return new Promise((ok,no)=>{try{const c=actx||newCtx(),p=c.decodeAudioData(ab,ok,no);if(p&&p.then)p.then(ok,no)}catch(e){no(e)}})}
+async function cueLoad(id){try{delete cueBuf[id];if(cueUrl[id]){URL.revokeObjectURL(cueUrl[id]);delete cueUrl[id]}const r=await cueGet(id);if(!r||!r.blob)return false;cueUrl[id]=URL.createObjectURL(r.blob);
+  try{if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();cueBuf[id]=await decodeBuf(await r.blob.arrayBuffer())}catch(e){}return true}catch(e){return false}}
+function cueOn(id){return (cueMode[id]==="rec"||cueMode[id]==="up")&&(cueBuf[id]||cueUrl[id])}
+/* plays the custom clip if set; returns false so the caller plays its default */
+function playCue(id){if(!cueOn(id)||restSound==="off")return false;const b=cueBuf[id],dur=b?b.duration*1000:3000;
+ if(audMode==="loud")setSession();else duckFor(dur+400);
+ const viaEl=()=>{try{const a=new Audio(cueUrl[id]);a.setAttribute("playsinline","");a.volume=1;const p=a.play();if(p&&p.catch)p.catch(()=>{const d={ready10:()=>{cueMode._skip=1;sayReady();delete cueMode._skip},restEnd:()=>playTones(restSound==="beep"?"beep":"buzz")}[id];d&&d()})}catch(e){}};
+ if(!b||!cueUrl[id]&&!b)return viaEl(),true;
+ (async()=>{try{if(!actx||actx.state==="closed"||actx.state==="interrupted")newCtx();if(actx.state!=="running")await Promise.race([actx.resume(),new Promise(r=>setTimeout(r,350))]);
+  if(actx.state!=="running")return viaEl();
+  const t0=actx.currentTime+.03,src=actx.createBufferSource(),g=actx.createGain(),m=actx.createDynamicsCompressor?actx.createDynamicsCompressor():null;src.buffer=b;g.gain.value=1.5;
+  if(m){m.threshold.value=-2;m.knee.value=0;m.ratio.value=20;m.attack.value=.001;m.release.value=.08;src.connect(g).connect(m).connect(actx.destination)}else src.connect(g).connect(actx.destination);
+  src.onended=()=>{if(audMode==="duck")duckFor(300)};src.start(t0)}catch(e){viaEl()}})();return true}
+function cueInit(){CUES.forEach(([id])=>{if(cueMode[id]==="rec"||cueMode[id]==="up")cueLoad(id)})}
+setTimeout(cueInit,0);
+function recMime(){const t=["audio/mp4","audio/mp4;codecs=mp4a.40.2","audio/aac","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return "";return t.find(x=>MediaRecorder.isTypeSupported(x))||""}
+function cueRowsHTML(){return CUES.map(([id,lab,def])=>{const m=cueMode[id]||"def";return `<div class="cuer" data-cue="${id}" style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(128,128,128,.25)"><b>${lab}</b><div class="seg" style="margin-top:6px">${[["def","Default"],["rec","Record"],["up","Upload"]].map(([k,n])=>`<button data-cm="${k}" class="${m===k?"on":""}">${n}</button>`).join("")}</div>
+ <div class="mu cst" style="margin:4px 0">${m==="def"?"Default: "+def:(cueUrl[id]?"Custom clip saved ✓":"No clip yet — default plays")}</div>
+ <div class="cpanel" ${m==="def"?'style="display:none"':""}>${m==="rec"?`<button class="w crec">🎙 ${cueUrl[id]?"Re-record":"Record"}</button>`:`<input type="file" accept="audio/*" class="cfile" style="margin-top:4px;font-size:16px">`}<button class="w cplay" ${cueUrl[id]?"":"disabled"}>▶ Preview</button><button class="w cdel" ${cueUrl[id]?"":"disabled"}>🗑 Remove clip</button></div></div>`}).join("")}
+let cueRec=null;
+function bindCues(root){const box=root.querySelector("#cueBox");if(!box)return;const redraw=()=>{box.innerHTML=cueRowsHTML();bindCues(root)};
+ box.querySelectorAll(".cuer").forEach(r=>{const id=r.dataset.cue,st=r.querySelector(".cst");
+  r.querySelectorAll("[data-cm]").forEach(b=>b.onclick=()=>{if(cueRec)return;cueMode[id]=b.dataset.cm;if(cueMode[id]==="def")delete cueMode[id];LS.set("gym.cueMode",cueMode);redraw()});
+  const pl=r.querySelector(".cplay");if(pl)pl.onclick=()=>{unlockAudio();const o=restSound;if(o==="off")restSound="buzz";if(!playCue(id))toast("No clip to play");restSound=o};
+  const dl=r.querySelector(".cdel");if(dl)dl.onclick=async()=>{if(!confirm("Remove this clip?"))return;await cueDel(id);delete cueBuf[id];if(cueUrl[id])URL.revokeObjectURL(cueUrl[id]);delete cueUrl[id];redraw()};
+  const fi=r.querySelector(".cfile");if(fi)fi.onchange=async()=>{const f=fi.files&&fi.files[0];if(!f)return;if(f.size>5e6&&!confirm("That file is over 5 MB. Short clips work best. Use it anyway?"))return;
+   await cuePut(id,f,f.name);const ok=await cueLoad(id);if(!cueBuf[id])toast("Saved, but this format may not play on this phone");else toast("Clip saved ✓");redraw()};
+  const rb=r.querySelector(".crec");if(rb)rb.onclick=async()=>{
+   if(cueRec){cueRec.stop();return}
+   if(!navigator.mediaDevices||!window.MediaRecorder){alert("Recording isn't supported in this browser. Use Upload instead (record a voice memo, then pick the file).");return}
+   let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){alert("Microphone blocked. iPhone: Settings → Safari → Microphone → Allow (or tap Allow when asked).");return}
+   const mt=recMime(),chunks=[];let mr;try{mr=mt?new MediaRecorder(stream,{mimeType:mt}):new MediaRecorder(stream)}catch(e){mr=new MediaRecorder(stream)}
+   cueRec=mr;let to;mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+   mr.onstop=async()=>{clearTimeout(to);stream.getTracks().forEach(t=>t.stop());cueRec=null;setSession();if(!chunks.length){toast("Nothing recorded");return redraw()}
+    const blob=new Blob(chunks,{type:mr.mimeType||mt||"audio/mp4"});await cuePut(id,blob,"recording");await cueLoad(id);toast("Recording saved ✓");redraw()};
+   mr.start();rb.textContent="⏹ Stop (max 10 s)";rb.className="w d crec";st.textContent="Recording…";to=setTimeout(()=>{if(mr.state==="recording")mr.stop()},10000)}})}
 function beep(){if(restSound==="off")return;playTones(restSound==="beep"?"beep":"buzz")}
 /* Phone timer alert: runs the user's "Gym Rest" iOS Shortcut, which starts a Clock timer (rings in background / on lock screen) */
 let phoneT=LS.get("gym.phoneT",false);
@@ -436,10 +481,10 @@ function phoneHelp(){openSheet("Phone timer setup",`<div class="card"><b>One-tim
 <div class="mu">Tip: if you change rest with −15/+15, tap ⏱ on the rest bar to restart the phone timer with the time left (it replaces the running timer). Skip doesn't stop the Clock timer; dismiss it on the phone. Don't add an "Open URL" action back to the app: it would open Safari, not the Home Screen app.</div></div>
 <button class="w" id="phTest">▶ Test: 10 s timer</button>`).querySelector("#phTest").onclick=()=>phoneTimer(10)}
 function vibNote(){if(!navigator.vibrate&&!LS.get("gym.vibNote",false)){LS.set("gym.vibNote",true);alert("Note: Safari on iPhone can't vibrate, so Buzz plays a loud buzz sound instead. Keep your volume up.")}}
-function restDone(){restAt=null;restOverTs=Date.now();if(navigator.vibrate)navigator.vibrate([350,150,350,150,350]);if(document.hidden)pendSound=true;else beep();const ago=restEnd?Math.round((Date.now()-restEnd)/1000):0;toast(ago>2?"Rest over "+(ago<60?ago+"s":Math.round(ago/60)+" min")+" ago 💪":"Rest over 💪")}
+function restDone(){restAt=null;restOverTs=Date.now();if(navigator.vibrate)navigator.vibrate([350,150,350,150,350]);if(document.hidden)pendSound=true;else{if(!playCue("restEnd"))beep()}const ago=restEnd?Math.round((Date.now()-restEnd)/1000):0;toast(ago>2?"Rest over "+(ago<60?ago+"s":Math.round(ago/60)+" min")+" ago 💪":"Rest over 💪")}
 document.addEventListener("pointerdown",unlockAudio,{capture:true,passive:true});document.addEventListener("touchend",unlockAudio,{capture:true,passive:true});
 document.addEventListener("visibilitychange",()=>{if(document.hidden)return;unlockAudio();tickFn();/* end time is a timestamp, so this fires at once on return */
- if(pendSound){pendSound=false;beep()}});
+ if(pendSound){pendSound=false;if(!(Date.now()-restOverTs<120000&&playCue("restEnd")))beep()}});
 setInterval(()=>{if(actx&&actx.state==="suspended"&&restEnd&&!document.hidden)actx.resume().catch(()=>{})},2000);
 function restPicker(i,j){const e=active.ex[i],s0=e.sets[j];let v=restOf(e,s0);
  const sh=openSheet("Rest timer · "+exName(e.exId)+" set "+(j+1),`<div class="rpv" id="rpv"></div><div class="row"><button class="ghost" id="rpm">−15s</button><button class="ghost" id="rpp">+15s</button></div>
@@ -457,7 +502,7 @@ function finishWorkout(){const a=active;
  const old=a.id?sessions.find(s=>s.id===a.id):null;
  const s={id:a.id||uid(),date:a.date,dow:parse(a.date).getDay(),day:a.name,group:a.group,week:weekOf(a.date),ex,armPain:a.armPain,kneePain:a.kneePain,notes:a.notes,saved:new Date().toISOString(),dur:old?old.dur:Date.now()-a.start};
  if(old)sessions=sessions.map(x=>x.id===s.id?s:x);else sessions.push(s);
- save();active=null;saveActive();restEnd=0;$("#aw").classList.add("hid");toast(old?"Saved ✓":"Workout complete 💪");show("history");if(LS.get("gym.askCoach",true))askCoach(s)}
+ save();playCue("wFinish");active=null;saveActive();restEnd=0;$("#aw").classList.add("hid");toast(old?"Saved ✓":"Workout complete 💪");show("history");if(LS.get("gym.askCoach",true))askCoach(s)}
 
 // ---- Send to Coach ----
 const COACH="arwin-gym@mail.grokbot.com";
@@ -646,7 +691,7 @@ function stopwatch(i,j){const e=active.ex[i],set=e.sets[j];if(!e||!set)return;co
  const stop=()=>{if(from){acc+=Date.now()-from;from=0}cdEnd=0;D.classList.remove("cd");show(acc);setBtn()};
  go.onclick=()=>{unlockAudio();if(from||cdEnd){stop();unlock();return}
   lock();if(!iv)iv=setInterval(loop,100);
-  if(!acc&&s.querySelector("#swC").checked){cdEnd=Date.now()+3000;lastCd=0;D.classList.add("cd")}else from=Date.now();setBtn();loop()};
+  if(!acc&&s.querySelector("#swC").checked){cdEnd=Date.now()+3000;lastCd=0;D.classList.add("cd");playCue("cd321")}else from=Date.now();setBtn();loop()};
  s.querySelector("#swR").onclick=()=>{from=0;cdEnd=0;acc=0;lastMin=0;tgHit=false;D.classList.remove("cd");show(0);setBtn();unlock();if(tg)setTx(I,"Target "+fmtS(tg)+" · buzz at target")};
  s.querySelector("#swC").onchange=ev=>LS.set("gym.swCd",ev.target.checked);
  const onVis=()=>{if(!document.hidden&&(from||cdEnd)){lock();loop()}};document.addEventListener("visibilitychange",onVis);
@@ -722,7 +767,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
  <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
- <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="sayC" ${sayOn?"checked":""} style="width:24px;min-height:24px"> Say a phrase at 10 seconds left</label><input id="sayT" value="${esc(sayTxt)}" placeholder="Get ready fatty" aria-label="Phrase" style="margin-top:6px;font-size:16px"><button class="w" id="sayTest">🗣 Test phrase</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div style="margin-top:12px"><b>Lock-screen notification</b><div class="mu" id="pushSt" style="margin:4px 0"></div><button class="w" id="pushBtn"></button></div><div style="margin-top:12px"><b>When a buzzer plays over music</b><div class="seg" id="amSeg" style="margin-top:8px">${[["mix","Play over"],["duck","Pause & resume (beta)"],["loud","Loud"]].map(([k,n])=>`<button data-am="${k}" class="${audMode===k?"on":""}">${n}</button>`).join("")}</div><div class="mu">Play over (default): buzz mixes on top of your music. Pause &amp; resume (beta, iOS 17+): song pauses for the buzz and may carry on; if you hear no buzz or the song stays paused, go back to Play over. Both follow the silent switch and only sound while the app is open, so turn on the lock-screen notification for alerts in other apps. Loud: ignores the silent switch but stops your music.</div></div><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
+ <div class="lbl">SETTINGS</div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="sayC" ${sayOn?"checked":""} style="width:24px;min-height:24px"> Say a phrase at 10 seconds left</label><input id="sayT" value="${esc(sayTxt)}" placeholder="Get ready fatty" aria-label="Phrase" style="margin-top:6px;font-size:16px"><button class="w" id="sayTest">🗣 Test phrase</button><div style="margin-top:14px"><b>Audio cues</b><div class="mu">Use your own recording or an audio file at each point. Default keeps the built-in sound. Clips are saved on this phone and work offline.</div><div id="cueBox">${cueRowsHTML()}</div></div><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div style="margin-top:12px"><b>Lock-screen notification</b><div class="mu" id="pushSt" style="margin:4px 0"></div><button class="w" id="pushBtn"></button></div><div style="margin-top:12px"><b>When a buzzer plays over music</b><div class="seg" id="amSeg" style="margin-top:8px">${[["mix","Play over"],["duck","Pause & resume (beta)"],["loud","Loud"]].map(([k,n])=>`<button data-am="${k}" class="${audMode===k?"on":""}">${n}</button>`).join("")}</div><div class="mu">Play over (default): buzz mixes on top of your music. Pause &amp; resume (beta, iOS 17+): song pauses for the buzz and may carry on; if you hear no buzz or the song stays paused, go back to Play over. Both follow the silent switch and only sound while the app is open, so turn on the lock-screen notification for alerts in other apps. Loud: ignores the silent switch but stops your music.</div></div><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
  chart("c0",{type:"bar",data:{labels,datasets:[{label:"Workouts",data:wk.map(w=>inW(w).length),backgroundColor:"#2f8cff"}]}});
@@ -738,7 +783,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  $("#pushBtn").onclick=async()=>{if(pushOn){pushOff();pst();return}try{await pushEnable();toast("Notifications on ✓ (test sent)")}catch(e){pushOn=false;LS.set("gym.pushOn",false);alert(e.message)}pst()};
  document.querySelectorAll("#amSeg [data-am]").forEach(b=>b.onclick=()=>{audMode=b.dataset.am;LS.set("gym.audMode2",audMode);audPrimed=false;setSession();document.querySelectorAll("#amSeg [data-am]").forEach(x=>x.classList.toggle("on",x===b))});
  $("#sayC").onchange=e=>{sayOn=e.target.checked;LS.set("gym.sayOn",sayOn)};$("#sayT").oninput=e=>{sayTxt=e.target.value;LS.set("gym.sayTxt",sayTxt)};$("#sayTest").onclick=()=>{unlockAudio();unlockSpeech();const o=sayOn;sayOn=true;sayReady();sayOn=o};
- $("#sndTest").onclick=()=>{unlockAudio();vibNote();playTones(restSound==="beep"?"beep":"buzz")};
+ bindCues(document);$("#sndTest").onclick=()=>{unlockAudio();vibNote();playTones(restSound==="beep"?"beep":"buzz")};
  $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
  $("#imJ").onclick=()=>$("#imF").click();
  $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;if(Array.isArray(d.photos))for(const p of d.photos)await putPhoto(p);migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
