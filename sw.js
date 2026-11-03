@@ -1,4 +1,4 @@
-// v2026-11-03-cues · Gym Log service worker: rest-end push notifications only (no caching, so updates always load fresh)
+// v2026-11-04-food · Gym Log service worker: rest-end push notifications only (no caching, so updates always load fresh)
 self.addEventListener("install",()=>self.skipWaiting());
 self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
 self.addEventListener("push",e=>{let d={};try{d=e.data?e.data.json():{}}catch(_){d={body:e.data&&e.data.text()}}

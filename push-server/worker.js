@@ -50,6 +50,7 @@ export default {
     if (req.method === "GET" && path === "/") return new Response("gym-push ok");
     if (!allowed || req.method !== "POST") return new Response("forbidden", { status: 403 });
     let j; try { j = await req.json() } catch { return new Response("bad json", { status: 400, headers: cors(o) }) }
+    if (path === "/food-scan") return foodScan(env, j, o);
     if (!/^[a-z0-9]{16,64}$/.test(j.id || "")) return new Response("bad id", { status: 400, headers: cors(o) });
     const stub = env.REST.get(env.REST.idFromName(j.id));
     const r = await stub.fetch("https://do/" + path.replace(/^\//, ""), { method: "POST", body: JSON.stringify(j) });
@@ -82,4 +83,22 @@ export class RestTimer {
     const r = await sendPush(this.env, sub, { title, body, at });
     if (r.status === 404 || r.status === 410) await this.s.storage.delete("sub");
   }
+}
+
+// ---- Food photo scan: vision AI server-side (key never reaches the browser) ----
+// Secret: XAI_API_KEY (wrangler secret put XAI_API_KEY). Optional VISION_MODEL (default grok-4).
+async function foodScan(env, j, o) {
+  const h = { ...cors(o), "Content-Type": "application/json" };
+  if (!env.XAI_API_KEY) return new Response(JSON.stringify({ error: "Food scan not set up (no vision key on server)" }), { status: 503, headers: h });
+  const img = String(j.image || "");
+  if (!/^data:image\/(jpeg|png|webp);base64,/.test(img) || img.length > 6e6) return new Response(JSON.stringify({ error: "bad image" }), { status: 400, headers: h });
+  const prompt = "Identify each food/drink in this photo. Estimate the portion actually shown. Return ONLY JSON: {\"items\":[{\"name\":string,\"serving\":string (e.g. '150 g' or '1 cup'),\"kcal\":number,\"p\":number,\"c\":number,\"f\":number}]} with protein/carbs/fat in grams for that portion. Use Australian food names. If no food, return {\"items\":[]}." + (j.hint ? " User note: " + String(j.hint).slice(0, 200) : "");
+  const r = await fetch("https://api.x.ai/v1/chat/completions", { method: "POST", headers: { Authorization: "Bearer " + env.XAI_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: env.VISION_MODEL || "grok-4", temperature: 0.2, messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: img, detail: "high" } }, { type: "text", text: prompt }] }] }) });
+  if (!r.ok) return new Response(JSON.stringify({ error: "vision API " + r.status }), { status: 502, headers: h });
+  const d = await r.json(); const t = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || "";
+  let out = { items: [] }; try { out = JSON.parse((t.match(/\{[\s\S]*\}/) || ["{}"])[0]) } catch {}
+  const n = v => Math.max(0, Math.round(+v || 0));
+  const items = (Array.isArray(out.items) ? out.items : []).slice(0, 12).map(x => ({ name: String(x.name || "Food").slice(0, 80), serving: String(x.serving || "1 serve").slice(0, 40), kcal: n(x.kcal), p: n(x.p), c: n(x.c), f: n(x.f) }));
+  return new Response(JSON.stringify({ items }), { headers: h });
 }
