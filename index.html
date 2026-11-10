@@ -41,12 +41,33 @@ nav button{flex:1;background:none;border-radius:0;min-height:62px;color:var(--mu
 .wpill.bad{background:rgba(255,69,58,.2);color:#ff453a}
 .wpill.flat{background:var(--card2);color:var(--mu)}
 .lb{background:var(--card);border-radius:16px;overflow:hidden;margin:0 0 14px}
-.lb-h,.lb-row{display:grid;grid-template-columns:48px minmax(0,1fr) 72px 28px;gap:4px;align-items:center;padding:8px 12px}
-.lb-h{font-size:11px;color:var(--mu);font-weight:700}
-.lb-row{width:100%;background:none;border:0;border-top:1px solid #2a2a2c;border-radius:0;min-height:56px;text-align:left;color:inherit;padding:10px 12px}
-.lb-day{font-size:22px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
-.lb-dow{font-size:11px;color:var(--mu);font-weight:600}
-.lb-kg{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.lb-h,.lb-row{display:grid;grid-template-columns:40px 46px 58px minmax(0,1fr) minmax(0,1.15fr);gap:3px;align-items:center;padding:8px 8px}
+.lb-h{font-size:10px;color:var(--mu);font-weight:700;line-height:1.2;text-align:left}
+.lb-row{width:100%;background:none;border:0;border-top:1px solid #2a2a2c;border-radius:0;min-height:52px;text-align:left;color:inherit;padding:7px 8px}
+.lb-row.wknd{background:rgba(90,110,200,.16)}
+.lb-row.gap{grid-template-columns:1fr;min-height:44px;color:var(--mu);font-size:13px;font-weight:600;justify-items:center}
+.lb-day{font-size:18px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.lb-dow{font-size:10px;color:var(--mu);font-weight:600}
+.lb-kg{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.lb-kg.none{color:var(--mu);font-weight:600;font-size:13px}
+.lb .wpill{padding:2px 5px;font-size:10px}
+.lb-fast{color:#bf5af2;font-size:11px;font-weight:800}
+.lb-sub{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-sub.mu{font-weight:600}
+.lb-food.under{color:#30d158}
+.lb-food.over{color:#ff9f0a}
+.lb-tag{display:inline-block;border-radius:6px;padding:2px 5px;font-size:10px;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.lb-tag.g-chest{background:rgba(47,140,255,.22);color:#64b0ff}
+.lb-tag.g-legs{background:rgba(48,209,88,.2);color:#30d158}
+.lb-tag.g-back{background:rgba(191,90,242,.22);color:#d19cff}
+.lb-tag.g-shoulders{background:rgba(255,159,10,.22);color:#ffb340}
+.lb-tag.g-calisthenics{background:rgba(100,210,255,.22);color:#64d2ff}
+.lb-tag.g-rehab{background:rgba(255,255,255,.1);color:#c7c7cc}
+.lb-tag.g-other{background:var(--card2);color:#d0d0d4}
+.lb-note{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ac);margin-top:2px}
+.wksum-row{padding:8px 0;border-bottom:1px solid #2a2a2c}
+.wksum-row:last-child{border:0}
+.wksum-meta{font-size:12px;color:var(--mu);margin-top:2px}
 .fab{position:fixed;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:50%;background:var(--ac);color:#fff;font-size:34px;line-height:1;font-weight:600;z-index:32;box-shadow:0 6px 18px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:0;min-height:60px}
 .kcal-lg{font-size:48px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
 .macros{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:13px;margin-top:10px}
@@ -853,33 +874,78 @@ function weeklyRate(arr,i){const cur=arr[i];let best=null,bestDist=99;
  for(let j=i-1;j>=0;j--){const days=dayDiff(arr[j].date,cur.date);if(days<3)continue;if(days>16)break;const dist=Math.abs(days-7);if(dist<bestDist){best=arr[j];bestDist=dist}}
  if(!best)return null;const days=dayDiff(best.date,cur.date);return (cur.kg-best.kg)*7/days}
 function ratePill(r){if(r==null)return`<span class="mu">—</span>`;const flat=Math.abs(r)<0.05,up=r>0;return`<span class="wpill ${flat?"flat":up?"up":"down"}">${flat?"→":up?"↑":"↓"} ${Math.abs(r).toFixed(1)}</span>`}
-function weighIn(existing){const x=existing||{date:iso(new Date()),kg:"",note:""};
+function weighIn(dateOrRow){const d0=typeof dateOrRow==="string"?dateOrRow:(dateOrRow&&dateOrRow.date)||iso(new Date());
+ const existing=weights.find(w=>w.date===d0);const x=existing||{date:d0,kg:"",note:""};
  const s=openSheet(existing?"Edit weigh-in":"Add weigh-in",`<label>Date<input type="date" id="bwD" value="${esc(x.date)}"></label><label>Weight (kg)<input type="number" step="0.1" inputmode="decimal" id="bwK" value="${x.kg||""}"></label><label>Notes (optional)<input id="bwN" value="${esc(x.note||"")}" placeholder="e.g. morning, after walk"></label><button class="p w" id="bwS">Save</button>${existing?'<button class="d w" id="bwDel">Delete</button>':""}`);
  $("#bwK").focus();
  $("#bwS").onclick=()=>{const kg=parseFloat($("#bwK").value),d=$("#bwD").value,note=$("#bwN").value.trim();if(!kg||!d)return alert("Enter a date and weight");
-  weights=weights.filter(w=>w.date!==d&&!(existing&&w.date===existing.date));const row={date:d,kg:+kg1(kg)};if(note)row.note=note;weights.push(row);weights.sort((a,b)=>a.date.localeCompare(b.date));save();s.remove();renderMeasure()};
+  weights=weights.filter(w=>w.date!==d&&w.date!==x.date);const row={date:d,kg:+kg1(kg)};if(note)row.note=note;weights.push(row);weights.sort((a,b)=>a.date.localeCompare(b.date));save();s.remove();renderMeasure()};
  if(existing)$("#bwDel").onclick=()=>{weights=weights.filter(w=>w.date!==existing.date);save();s.remove();renderMeasure()}}
 function setWeightGoal(){const cur=LS.get("gym.weightGoal",null);const s=openSheet("Weight goal",`<label>Goal weight (kg)<input type="number" step="0.1" inputmode="decimal" id="wg" value="${cur??""}"></label><button class="p w" id="wgS">Save goal</button>${cur?'<button class="ghost w" id="wgC">Clear goal</button>':""}`);
  $("#wgS").onclick=()=>{const v=parseFloat($("#wg").value);if(!v)return;LS.set("gym.weightGoal",+kg1(v));s.remove();renderMeasure()};
  const c=$("#wgC");if(c)c.onclick=()=>{localStorage.removeItem("gym.weightGoal");s.remove();renderMeasure()}}
+const shiftDate=(d,n)=>{const x=parse(d);x.setDate(x.getDate()+n);return iso(x)};
+let lbGapsOpen=new Set();
+function earliestLogDate(){let d=iso(START);
+ (weights||[]).forEach(w=>{if(w.date&&w.date<d)d=w.date});
+ (sessions||[]).forEach(s=>{if(s.date&&s.date<d)d=s.date});
+ if(typeof fLog!=="undefined")Object.keys(fLog||{}).forEach(k=>{if(k<d)d=k});
+ if(typeof fFast!=="undefined")Object.keys(fFast||{}).forEach(k=>{if(k<d)d=k});
+ return d}
+function lbHasFood(d){try{return typeof fHasFood==="function"&&(fHasFood(d)||(typeof fDayLogged==="function"&&fDayLogged(d)))}catch(e){return false}}
+function lbFoodCell(d){try{if(typeof fFastDay==="function"&&(fFastDay(d)||(typeof fDayLogged==="function"&&fDayLogged(d)&&!fHasFood(d))))return`<span class="lb-fast">Fast</span>`;const t=typeof fTot==="function"?fTot(d):null;if(t&&t.kcal){const g=(typeof fGoals==="function"?fGoals():FG_DEF||{}).kcal||2200;return`<span class="lb-sub lb-food ${t.kcal>g?"over":"under"}">${Math.round(t.kcal).toLocaleString("en-AU")}</span>`}}catch(e){}return""}
+function lbTrainClass(name,group){const s=(group||name||"").toLowerCase();if(/chest/.test(s))return"g-chest";if(/leg/.test(s))return"g-legs";if(/back/.test(s))return"g-back";if(/shoulder|core/.test(s))return"g-shoulders";if(/calisthen|balance/.test(s))return"g-calisthenics";if(/rehab|arm/.test(s))return"g-rehab";return"g-other"}
+function lbTrainCell(d){const list=(sessions||[]).filter(s=>s.date===d);if(!list.length)return"";const names=[],seen=new Set();list.forEach(s=>{const n=s.day||s.group||s.name||"Workout";if(!seen.has(n)){seen.add(n);names.push({n,g:s.group||n})}});const extra=names.length-1;return`<span class="lb-tag ${lbTrainClass(names[0].n,names[0].g)}">${esc(names[0].n)}${extra>0?" +"+extra:""}</span>`}
+function weekStats(m){const end=weekEnd(m),wIn=weights.filter(w=>w.date>=m&&w.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+ const prevW=weights.filter(w=>w.date>=shiftDate(m,-7)&&w.date<m).sort((a,b)=>a.date.localeCompare(b.date));
+ const lastW=wIn.length?wIn[wIn.length-1].kg:null;
+ const base=prevW.length?prevW[prevW.length-1].kg:(wIn.length>=2?wIn[0].kg:null);
+ const dW=(lastW!=null&&base!=null)?lastW-base:null;
+ const carryW=lastW!=null?lastW:(weights.filter(w=>w.date<m).sort((a,b)=>a.date.localeCompare(b.date)).pop()||{}).kg??null;
+ let kcalSum=0,kcalN=0,fastN=0;
+ for(let d=m;d<=end;d=shiftDate(d,1)){let fast=false,food=false,kcal=0;
+  try{fast=typeof fFastDay==="function"&&(fFastDay(d)||(typeof fDayLogged==="function"&&fDayLogged(d)&&!fHasFood(d)));if(typeof fTot==="function"){const t=fTot(d);if(t&&t.kcal){food=true;kcal=t.kcal}}}catch(e){}
+  if(fast)fastN++;else if(food){kcalSum+=kcal;kcalN++}}
+ return{m,end,dW,lastW,carryW,avgK:kcalN?kcalSum/kcalN:null,kcalN,fastN,sessN:(sessions||[]).filter(s=>s.date>=m&&s.date<=end).length}}
+function weekSumHTML(){const weeks=weeksBack(8).slice().reverse().map(weekStats);
+ const row=st=>{const pill=st.dW==null?`<span class="mu">— kg</span>`:`<span class="wpill ${st.dW>0.05?"up":st.dW<-0.05?"down":"flat"}">${st.dW>0?"↑":st.dW<0?"↓":"→"} ${Math.abs(st.dW).toFixed(1)} kg</span>`;
+  const food=st.avgK==null?"No food logged":Math.round(st.avgK).toLocaleString("en-AU")+" kcal/d";
+  return`<div class="wksum-row"><div class="rowb"><b>${dmy(st.m).slice(0,5)}–${dmy(st.end).slice(0,5)}</b>${pill}</div><div class="wksum-meta">${food} · ${st.fastN} fast · ${st.sessN} session${st.sessN===1?"":"s"}</div></div>`};
+ return`<div class="lbl">WEEKLY SNAPSHOT</div><div class="card">${weeks.map(row).join("")}</div>`}
+function lbItems(){const today=iso(new Date()),start=earliestLogDate(),days=[];
+ for(let d=today;d>=start;d=shiftDate(d,-1))days.push(d);
+ const empty=d=>!weights.some(w=>w.date===d)&&!lbHasFood(d)&&!(sessions||[]).some(s=>s.date===d);
+ const items=[];let i=0;
+ while(i<days.length){if(!empty(days[i])){items.push({type:"day",date:days[i]});i++;continue}
+  let j=i;while(j<days.length&&empty(days[j]))j++;const n=j-i;
+  if(n>14){const key=days[j-1]+"_"+days[i];if(lbGapsOpen.has(key)){for(let k=i;k<j;k++)items.push({type:"day",date:days[k]})}else items.push({type:"gap",from:days[j-1],to:days[i],n,key});i=j}
+  else{for(let k=i;k<j;k++)items.push({type:"day",date:days[k]});i=j}}
+ return items}
 function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
  const goal=LS.get("gym.weightGoal",null),sorted=[...weights].sort((a,b)=>a.date.localeCompare(b.date));
  const last=sorted.length?sorted[sorted.length-1].kg:START_WEIGHT,lost=START_WEIGHT-last,toGo=goal!=null?last-goal:null;
  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
- let months=[],curM="";
- [...sorted].reverse().forEach((w,revI,rev)=>{const i=sorted.length-1-revI,mk=w.date.slice(0,7);if(mk!==curM){curM=mk;const[y,m]=mk.split("-");months.push({label:MONTHS[+m-1]+" "+y,rows:[]})}
-  months[months.length-1].rows.push({w,i,rate:weeklyRate(sorted,i)})});
+ const idxOf=d=>sorted.findIndex(w=>w.date===d);
+ const items=lbItems();let months=[],curM="";
+ items.forEach(it=>{const d=it.type==="gap"?it.to:it.date,mk=d.slice(0,7);if(mk!==curM){curM=mk;const[y,m]=mk.split("-");months.push({label:MONTHS[+m-1]+" "+y,rows:[]})}months[months.length-1].rows.push(it)});
  const startPt=!sorted.some(w=>w.date===iso(START));
  const labels=(startPt?[{date:iso(START),kg:START_WEIGHT},...sorted]:sorted);
+ const dayRow=it=>{const d=it.date,w=weights.find(x=>x.date===d),dow=parse(d).getDay(),wknd=dow===0||dow===6,i=idxOf(d);
+  return`<button type="button" class="lb-row${wknd?" wknd":""}" data-bw="${d}"><div><div class="lb-day">${+d.slice(8)}</div><div class="lb-dow">${DAYS[dow]}</div>${w&&w.note?'<span class="lb-note" aria-label="Has note"></span>':""}</div><div class="${w?"lb-kg":"lb-kg none"}">${w?kg1(w.kg):"—"}</div><div>${w?ratePill(weeklyRate(sorted,i)):""}</div><div>${lbFoodCell(d)}</div><div>${lbTrainCell(d)}</div></button>`};
+ const gapRow=it=>`<button type="button" class="lb-row gap" data-gap="${it.key}">${it.n} days — no entries</button>`;
  $("#v-measure").innerHTML=`<div class="card"><div class="mu">Now</div><div class="rowb" style="align-items:flex-end"><div class="kcal-lg">${kg1(last)}</div><div class="mu" style="text-align:right">kg</div></div>
   <div class="mu" style="margin-top:4px">${lost>=0?"−"+kg1(lost)+" kg since start":"+"+kg1(-lost)+" kg since start"} (${kg1(START_WEIGHT)} kg on ${dmy(iso(START))})${goal!=null?` · goal ${kg1(goal)} kg · ${toGo<=0?"goal reached":kg1(toGo)+" kg to go"}`:""}</div>
   ${window.Chart?`<div style="height:160px;margin-top:10px"><canvas id="c5"></canvas></div>`:""}
   <button class="sm w" id="bwGoal">${goal!=null?"Edit weight goal":"Set a goal weight"}</button></div>
-  ${sorted.length?months.map(mo=>`<div class="lbl">${esc(mo.label)}</div><div class="lb"><div class="lb-h"><span>Date</span><span>Recorded</span><span>Weekly rate</span><span></span></div>${mo.rows.map(({w,rate})=>`<button type="button" class="lb-row" data-bw="${w.date}"><div><div class="lb-day">${+w.date.slice(8)}</div><div class="lb-dow">${DAYS[parse(w.date).getDay()]}</div></div><div class="lb-kg">${kg1(w.kg)}</div><div>${ratePill(rate)}</div><div>${w.note?"📝":""}</div></button>`).join("")}</div>`).join(""):`<div class="card mu">No weigh-ins yet. Tap + to log your weight. Existing entries are kept when you add more.</div>`}
+  ${weekSumHTML()}
+  ${months.map(mo=>`<div class="lbl">${esc(mo.label)}</div><div class="lb"><div class="lb-h"><span>Date</span><span>Recorded</span><span>Weekly rate</span><span>Food</span><span>Training</span></div>${mo.rows.map(it=>it.type==="gap"?gapRow(it):dayRow(it)).join("")}</div>`).join("")}
   <div style="height:72px"></div><button type="button" class="fab" id="bwAdd" aria-label="Add weigh-in">+</button>`;
- if($("#c5")&&window.Chart)chart("c5",{type:"line",data:{labels:labels.map(x=>dmy(x.date).slice(0,5)),datasets:[{label:"kg",data:labels.map(x=>x.kg),borderColor:"#30d158",backgroundColor:"rgba(48,209,88,.12)",pointRadius:3,tension:0.15,fill:false},...(goal!=null?[{label:"Goal",data:labels.map(()=>goal),borderColor:"#2f8cff",borderDash:[6,4],pointRadius:0,fill:false}]:[])]},options:{plugins:{legend:{display:!!goal}},scales:{y:{beginAtZero:false,ticks:{color:"#8e8e93"}},x:{ticks:{color:"#8e8e93",maxRotation:0}}},animation:false}});
- $("#bwAdd").onclick=()=>weighIn(null);$("#bwGoal").onclick=setWeightGoal;
- $("#v-measure").querySelectorAll("[data-bw]").forEach(b=>b.onclick=()=>weighIn(weights.find(w=>w.date===b.dataset.bw)));
+ const wks=weeksBack(8),wSt=wks.map(weekStats);
+ let carry=null;const kgPts=wSt.map(st=>{if(st.carryW!=null)carry=st.carryW;else if(st.lastW!=null)carry=st.lastW;return carry});
+ if($("#c5")&&window.Chart)chart("c5",{type:"line",data:{labels:wks.map(m=>dmy(m).slice(0,5)),datasets:[{label:"kg",data:kgPts,borderColor:"#30d158",yAxisID:"y",spanGaps:true,tension:0.15,pointRadius:3,fill:false},...(goal!=null?[{label:"Goal",data:wks.map(()=>goal),borderColor:"#2f8cff",yAxisID:"y",borderDash:[6,4],pointRadius:0,fill:false}]:[]),{label:"kcal/day",data:wSt.map(st=>st.avgK),borderColor:"#ff9f0a",yAxisID:"y2",spanGaps:true,tension:0.15,pointRadius:3,borderDash:[4,3],fill:false}]},options:{plugins:{legend:{display:true,labels:{color:"#f2f2f7",boxWidth:10}}},scales:{y:{beginAtZero:false,ticks:{color:"#8e8e93"},title:{display:true,text:"kg",color:"#8e8e93"}},y2:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},ticks:{color:"#ff9f0a"},title:{display:true,text:"kcal/d",color:"#ff9f0a"}},x:{ticks:{color:"#8e8e93",maxRotation:0}}},animation:false}});
+ $("#bwAdd").onclick=()=>weighIn();$("#bwGoal").onclick=setWeightGoal;
+ $("#v-measure").querySelectorAll("[data-bw]").forEach(b=>b.onclick=()=>weighIn(b.dataset.bw));
+ $("#v-measure").querySelectorAll("[data-gap]").forEach(b=>b.onclick=()=>{lbGapsOpen.has(b.dataset.gap)?lbGapsOpen.delete(b.dataset.gap):lbGapsOpen.add(b.dataset.gap);renderMeasure()});
 }
 
 // ---- Web Push: lock-screen notification when rest ends (server schedules it; see gym-push worker) ----
