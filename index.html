@@ -41,7 +41,7 @@ nav button{flex:1;background:none;border-radius:0;min-height:62px;color:var(--mu
 .wpill.bad{background:rgba(255,69,58,.2);color:#ff453a}
 .wpill.flat{background:var(--card2);color:var(--mu)}
 .lb{background:var(--card);border-radius:16px;overflow:hidden;margin:0 0 14px}
-.lb-h,.lb-row{display:grid;grid-template-columns:40px 46px 58px minmax(0,1fr) minmax(0,1.15fr);gap:3px;align-items:center;padding:8px 8px}
+.lb-h,.lb-row{display:grid;grid-template-columns:38px 44px 54px minmax(0,1.2fr) minmax(0,1fr);gap:3px;align-items:center;padding:8px 8px}
 .lb-h{font-size:10px;color:var(--mu);font-weight:700;line-height:1.2;text-align:left}
 .lb-row{width:100%;background:none;border:0;border-top:1px solid #2a2a2c;border-radius:0;min-height:52px;text-align:left;color:inherit;padding:7px 8px}
 .lb-row.wknd{background:rgba(90,110,200,.16)}
@@ -56,6 +56,18 @@ nav button{flex:1;background:none;border-radius:0;min-height:62px;color:var(--mu
 .lb-sub.mu{font-weight:600}
 .lb-food.under{color:#30d158}
 .lb-food.over{color:#ff9f0a}
+.lb-mac{font-size:10px;line-height:1.25;color:var(--mu);font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;letter-spacing:-0.02em}
+.lb-cam{display:block;font-size:11px;line-height:1;margin-top:2px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+.cmp img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;display:block;background:var(--card2)}
+.cmp figcaption{font-size:13px;margin-top:6px;text-align:center}
+.cmp .thumbs{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.cmp .thumbs img{width:40px;height:40px;border-radius:6px;object-fit:cover;opacity:.65}
+.cmp .thumbs img.on{opacity:1;outline:2px solid var(--ac)}
+.pic-thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.pic-thumbs figure{margin:0;background:var(--card2);border-radius:10px;padding:4px;position:relative}
+.pic-thumbs img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block}
+.pic-thumbs .rm{position:absolute;top:6px;right:6px;min-height:32px;padding:4px 8px;font-size:13px}
 .lb-tag{display:inline-block;border-radius:6px;padding:2px 5px;font-size:10px;font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
 .lb-tag.g-chest{background:rgba(47,140,255,.22);color:#64b0ff}
 .lb-tag.g-legs{background:rgba(48,209,88,.2);color:#30d158}
@@ -737,11 +749,17 @@ const TYPES={"chest-press-machine":["Seated (selectorised)","Plate-loaded","Conv
 "shoulder-press-machine":["Selectorised","Plate-loaded","Smith machine"],"lateral-raise":["Dumbbell","Cable","Lateral raise machine"],"face-pull":["Cable + rope","Band"],
 "incline-push-up":["Bench","Smith bar","Wall/rail"],"inverted-row":["Smith bar","TRX/rings","Fixed bar"],"seated-leg-extension":["Leg extension machine","Ankle weight","Band"],"slow-low-step-ups":["Low step/box","Aerobic step","Bodyweight"]};
 function typesOf(x){const base=TYPES[x.id]||(x.rehab?["Band","Dumbbell","Cable"]:/Calisthenics|Core/.test(x.group)?["Bodyweight","Mat","Rail/support"]:["Machine","Cable","Dumbbell","Bodyweight"]);return[...new Set([...base,...(x.types||[])])]}
-let _db;function db(){return _db||(_db=new Promise((ok,no)=>{const r=indexedDB.open("gymPhotos",1);r.onupgradeneeded=()=>r.result.createObjectStore("photos",{keyPath:"id"}).createIndex("exId","exId");r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}))}
+let _db;function db(){return _db||(_db=new Promise((ok,no)=>{const r=indexedDB.open("gymPhotos",2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains("photos"))d.createObjectStore("photos",{keyPath:"id"}).createIndex("exId","exId");if(!d.objectStoreNames.contains("progress"))d.createObjectStore("progress",{keyPath:"id"}).createIndex("date","date")};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}))}
 async function tx(mode,f){const d=await db();return new Promise((ok,no)=>{const t=d.transaction("photos",mode),s=t.objectStore("photos");let out;const r=f(s);if(r)r.onsuccess=()=>out=r.result;t.oncomplete=()=>ok(out);t.onerror=()=>no(t.error)})}
 const photosOf=exId=>tx("readonly",s=>s.index("exId").getAll(exId));
 const allPhotos=()=>tx("readonly",s=>s.getAll());
 const putPhoto=p=>tx("readwrite",s=>s.put(p));const delPhoto=id=>tx("readwrite",s=>s.delete(id));
+async function ptx(mode,f){const d=await db();return new Promise((ok,no)=>{if(!d.objectStoreNames.contains("progress"))return ok(mode==="readonly"?[]:undefined);const t=d.transaction("progress",mode),s=t.objectStore("progress");let out;const r=f(s);if(r)r.onsuccess=()=>out=r.result;t.oncomplete=()=>ok(out);t.onerror=()=>no(t.error)})}
+const progAll=()=>ptx("readonly",s=>s.getAll()).then(a=>a||[]);
+const progOf=d=>ptx("readonly",s=>s.index("date").getAll(d)).then(a=>a||[]);
+const progPut=p=>ptx("readwrite",s=>s.put(p));
+const progDel=id=>ptx("readwrite",s=>s.delete(id));
+function shrinkProg(file){return new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const k=Math.min(1,1080/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",.7))};im.onerror=()=>no(new Error("Couldn't read photo"));im.src=u})}
 function compress(file){return new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",.72))};im.onerror=()=>no(new Error("Could not read image"));im.src=u})}
 let photoIn=null;
 /* stopwatch for timed sets: timestamp-based, digits-only updates, wake lock */
@@ -876,16 +894,29 @@ function weeklyRate(arr,i){const cur=arr[i];let best=null,bestDist=99;
 function ratePill(r){if(r==null)return`<span class="mu">—</span>`;const flat=Math.abs(r)<0.05,up=r>0;return`<span class="wpill ${flat?"flat":up?"up":"down"}">${flat?"→":up?"↑":"↓"} ${Math.abs(r).toFixed(1)}</span>`}
 function weighIn(dateOrRow){const d0=typeof dateOrRow==="string"?dateOrRow:(dateOrRow&&dateOrRow.date)||iso(new Date());
  const existing=weights.find(w=>w.date===d0);const x=existing||{date:d0,kg:"",note:""};
- const s=openSheet(existing?"Edit weigh-in":"Add weigh-in",`<label>Date<input type="date" id="bwD" value="${esc(x.date)}"></label><label>Weight (kg)<input type="number" step="0.1" inputmode="decimal" id="bwK" value="${x.kg||""}"></label><label>Notes (optional)<input id="bwN" value="${esc(x.note||"")}" placeholder="e.g. morning, after walk"></label><button class="p w" id="bwS">Save</button>${existing?'<button class="d w" id="bwDel">Delete</button>':""}`);
+ const s=openSheet(existing?"Edit weigh-in":"Add weigh-in",`<label>Date<input type="date" id="bwD" value="${esc(x.date)}"></label><label>Weight (kg)<input type="number" step="0.1" inputmode="decimal" id="bwK" value="${x.kg||""}"></label><label>Notes (optional)<input id="bwN" value="${esc(x.note||"")}" placeholder="e.g. morning, after walk"></label>
+  <div class="lbl">PHOTOS</div><div id="bwPics" class="pic-thumbs"></div><input type="file" id="bwPicF" accept="image/*" class="hid"><button type="button" class="ghost w" id="bwPicAdd">📷 Add photo</button><div class="mu">Up to 3 photos. Kept on this phone only — not included in the JSON export.</div>
+  <button class="p w" id="bwS">Save</button>${existing?'<button class="d w" id="bwDel">Delete</button>':""}`);
+ const close=s.querySelector("[data-close]");if(close)close.onclick=()=>{s.remove();renderMeasure()};
+ const dateOf=()=>$("#bwD").value||d0;
+ const drawPics=async()=>{let ps=[];try{ps=(await progOf(dateOf())).sort((a,b)=>a.ts-b.ts)}catch(e){ps=[]}
+  $("#bwPics").innerHTML=ps.map(p=>`<figure><img src="${p.data}" alt="Progress photo"><button type="button" class="sm d rm" data-pdel="${p.id}">✕</button></figure>`).join("");
+  $("#bwPicAdd").disabled=ps.length>=3;$("#bwPicAdd").style.display=ps.length>=3?"none":"";
+  s.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=async ev=>{ev.preventDefault();ev.stopPropagation();if(!confirm("Remove this photo?"))return;try{await progDel(b.dataset.pdel)}catch(e){}drawPics()})};
+ drawPics();
+ $("#bwPicAdd").onclick=()=>$("#bwPicF").click();
+ $("#bwPicF").onchange=async()=>{const f=$("#bwPicF").files[0];$("#bwPicF").value="";if(!f)return;let ps=[];try{ps=await progOf(dateOf())}catch(e){ps=[]}if(ps.length>=3)return alert("Maximum of 3 photos for a day");
+  try{const data=await shrinkProg(f);await progPut({id:uid(),date:dateOf(),data,ts:Date.now()});toast("Photo saved ✓");drawPics()}catch(e){alert(e.message||"Couldn't add photo")}};
  $("#bwK").focus();
- $("#bwS").onclick=()=>{const kg=parseFloat($("#bwK").value),d=$("#bwD").value,note=$("#bwN").value.trim();if(!kg||!d)return alert("Enter a date and weight");
+ $("#bwS").onclick=async()=>{const kg=parseFloat($("#bwK").value),d=$("#bwD").value,note=$("#bwN").value.trim();if(!kg||!d)return alert("Enter a date and weight");
+  if(d!==d0){try{const ps=await progOf(d0);for(const p of ps){await progDel(p.id);p.date=d;await progPut(p)}}catch(e){}}
   weights=weights.filter(w=>w.date!==d&&w.date!==x.date);const row={date:d,kg:+kg1(kg)};if(note)row.note=note;weights.push(row);weights.sort((a,b)=>a.date.localeCompare(b.date));save();s.remove();renderMeasure()};
  if(existing)$("#bwDel").onclick=()=>{weights=weights.filter(w=>w.date!==existing.date);save();s.remove();renderMeasure()}}
 function setWeightGoal(){const cur=LS.get("gym.weightGoal",null);const s=openSheet("Weight goal",`<label>Goal weight (kg)<input type="number" step="0.1" inputmode="decimal" id="wg" value="${cur??""}"></label><button class="p w" id="wgS">Save goal</button>${cur?'<button class="ghost w" id="wgC">Clear goal</button>':""}`);
  $("#wgS").onclick=()=>{const v=parseFloat($("#wg").value);if(!v)return;LS.set("gym.weightGoal",+kg1(v));s.remove();renderMeasure()};
  const c=$("#wgC");if(c)c.onclick=()=>{localStorage.removeItem("gym.weightGoal");s.remove();renderMeasure()}}
 const shiftDate=(d,n)=>{const x=parse(d);x.setDate(x.getDate()+n);return iso(x)};
-let lbGapsOpen=new Set();
+let lbGapsOpen=new Set(),lbView="logbook",cmpPick=null;
 function earliestLogDate(){let d=iso(START);
  (weights||[]).forEach(w=>{if(w.date&&w.date<d)d=w.date});
  (sessions||[]).forEach(s=>{if(s.date&&s.date<d)d=s.date});
@@ -893,7 +924,7 @@ function earliestLogDate(){let d=iso(START);
  if(typeof fFast!=="undefined")Object.keys(fFast||{}).forEach(k=>{if(k<d)d=k});
  return d}
 function lbHasFood(d){try{return typeof fHasFood==="function"&&(fHasFood(d)||(typeof fDayLogged==="function"&&fDayLogged(d)))}catch(e){return false}}
-function lbFoodCell(d){try{if(typeof fFastDay==="function"&&(fFastDay(d)||(typeof fDayLogged==="function"&&fDayLogged(d)&&!fHasFood(d))))return`<span class="lb-fast">Fast</span>`;const t=typeof fTot==="function"?fTot(d):null;if(t&&t.kcal){const g=(typeof fGoals==="function"?fGoals():FG_DEF||{}).kcal||2200;return`<span class="lb-sub lb-food ${t.kcal>g?"over":"under"}">${Math.round(t.kcal).toLocaleString("en-AU")}</span>`}}catch(e){}return""}
+function lbFoodCell(d){try{if(typeof fFastDay==="function"&&(fFastDay(d)||(typeof fDayLogged==="function"&&fDayLogged(d)&&!fHasFood(d))))return`<span class="lb-fast">Fast</span>`;const t=typeof fTot==="function"?fTot(d):null;if(t&&t.kcal){const g=(typeof fGoals==="function"?fGoals():FG_DEF||{}).kcal||2200;return`<div><div class="lb-sub lb-food ${t.kcal>g?"over":"under"}">${Math.round(t.kcal).toLocaleString("en-AU")}</div><div class="lb-mac">P${Math.round(t.p)} C${Math.round(t.c)}<br>F${Math.round(t.f)} Fi${Math.round(t.fib)}</div></div>`}}catch(e){}return""}
 function lbTrainClass(name,group){const s=(group||name||"").toLowerCase();if(/chest/.test(s))return"g-chest";if(/leg/.test(s))return"g-legs";if(/back/.test(s))return"g-back";if(/shoulder|core/.test(s))return"g-shoulders";if(/calisthen|balance/.test(s))return"g-calisthenics";if(/rehab|arm/.test(s))return"g-rehab";return"g-other"}
 function lbTrainCell(d){const list=(sessions||[]).filter(s=>s.date===d);if(!list.length)return"";const names=[],seen=new Set();list.forEach(s=>{const n=s.day||s.group||s.name||"Workout";if(!seen.has(n)){seen.add(n);names.push({n,g:s.group||n})}});const extra=names.length-1;return`<span class="lb-tag ${lbTrainClass(names[0].n,names[0].g)}">${esc(names[0].n)}${extra>0?" +"+extra:""}</span>`}
 function weekStats(m){const end=weekEnd(m),wIn=weights.filter(w=>w.date>=m&&w.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
@@ -921,7 +952,17 @@ function lbItems(){const today=iso(new Date()),start=earliestLogDate(),days=[];
   if(n>14){const key=days[j-1]+"_"+days[i];if(lbGapsOpen.has(key)){for(let k=i;k<j;k++)items.push({type:"day",date:days[k]})}else items.push({type:"gap",from:days[j-1],to:days[i],n,key});i=j}
   else{for(let k=i;k<j;k++)items.push({type:"day",date:days[k]});i=j}}
  return items}
-function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
+function photosViewHTML(picsBy){const dates=Object.keys(picsBy).sort().reverse();
+ if(!dates.length)return`<div class="card mu">No progress photos yet. Open a day in the logbook and tap Add photo. Photos stay on this phone and are not in the JSON export.</div>`;
+ return`<div class="mu" style="margin:0 0 8px">Photos stay on this phone and are not in the JSON export.</div><button class="sm w" id="pgCmp">${cmpPick?"Tap two days… (cancel)":"Compare two days"}</button><div class="pg" id="pgGrid" style="margin-top:10px">${dates.map(d=>{const ps=picsBy[d].slice().sort((a,b)=>a.ts-b.ts),w=weights.find(x=>x.date===d);return`<figure data-pd="${d}" class="${cmpPick&&cmpPick.includes(d)?"hl":""}"><img src="${ps[0].data}" alt=""><figcaption>${dmy(d)}${w?` · ${kg1(w.kg)} kg`:""}${ps.length>1?` · ${ps.length}`:""}</figcaption></figure>`}).join("")}</div>`}
+function showCompare(a,b,picsBy){const col=(d,side)=>{const ps=(picsBy[d]||[]).slice().sort((x,y)=>x.ts-y.ts),w=weights.find(x=>x.date===d);const first=ps[0];return`<figure><img id="cmp${side}" src="${first?first.data:""}" alt=""><figcaption><b>${dmy(d)}</b>${w?` · ${kg1(w.kg)} kg`:" · no weight"}</figcaption>${ps.length>1?`<div class="thumbs">${ps.map((p,i)=>`<img data-cs="${side}" data-src="${p.data}" class="${i===0?"on":""}" alt="">`).join("")}</div>`:""}</figure>`};
+ const sh=openSheet("Compare",`<div class="cmp">${col(a,"A")}${col(b,"B")}</div>`);
+ sh.querySelectorAll("[data-cs]").forEach(t=>t.onclick=()=>{const side=t.dataset.cs;$("#cmp"+side).src=t.dataset.src;sh.querySelectorAll(`[data-cs="${side}"]`).forEach(x=>x.classList.toggle("on",x===t))})}
+function bindPhotosView(picsBy){$("#pgCmp")&&($("#pgCmp").onclick=()=>{cmpPick=cmpPick?null:[];renderMeasure()});
+ document.querySelectorAll("#pgGrid [data-pd]").forEach(f=>f.onclick=()=>{const d=f.dataset.pd;if(cmpPick){if(!cmpPick.includes(d))cmpPick.push(d);if(cmpPick.length>=2){const pair=cmpPick.slice(0,2);cmpPick=null;renderMeasure();showCompare(pair[0],pair[1],picsBy)}else renderMeasure()}else weighIn(d)})}
+async function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
+ let progList=[];try{progList=await progAll()}catch(e){progList=[]}
+ const picsBy={};(progList||[]).forEach(p=>{(picsBy[p.date]=picsBy[p.date]||[]).push(p)});
  const goal=LS.get("gym.weightGoal",null),sorted=[...weights].sort((a,b)=>a.date.localeCompare(b.date));
  const last=sorted.length?sorted[sorted.length-1].kg:START_WEIGHT,lost=START_WEIGHT-last,toGo=goal!=null?last-goal:null;
  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -931,9 +972,12 @@ function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
  const startPt=!sorted.some(w=>w.date===iso(START));
  const labels=(startPt?[{date:iso(START),kg:START_WEIGHT},...sorted]:sorted);
  const dayRow=it=>{const d=it.date,w=weights.find(x=>x.date===d),dow=parse(d).getDay(),wknd=dow===0||dow===6,i=idxOf(d);
-  return`<button type="button" class="lb-row${wknd?" wknd":""}" data-bw="${d}"><div><div class="lb-day">${+d.slice(8)}</div><div class="lb-dow">${DAYS[dow]}</div>${w&&w.note?'<span class="lb-note" aria-label="Has note"></span>':""}</div><div class="${w?"lb-kg":"lb-kg none"}">${w?kg1(w.kg):"—"}</div><div>${w?ratePill(weeklyRate(sorted,i)):""}</div><div>${lbFoodCell(d)}</div><div>${lbTrainCell(d)}</div></button>`};
+  return`<button type="button" class="lb-row${wknd?" wknd":""}" data-bw="${d}"><div><div class="lb-day">${+d.slice(8)}</div><div class="lb-dow">${DAYS[dow]}</div>${w&&w.note?'<span class="lb-note" aria-label="Has note"></span>':""}${picsBy[d]&&picsBy[d].length?'<span class="lb-cam" aria-label="Has photo">📷</span>':""}</div><div class="${w?"lb-kg":"lb-kg none"}">${w?kg1(w.kg):"—"}</div><div>${w?ratePill(weeklyRate(sorted,i)):""}</div><div>${lbFoodCell(d)}</div><div>${lbTrainCell(d)}</div></button>`};
  const gapRow=it=>`<button type="button" class="lb-row gap" data-gap="${it.key}">${it.n} days — no entries</button>`;
- $("#v-measure").innerHTML=`<div class="card"><div class="mu">Now</div><div class="rowb" style="align-items:flex-end"><div class="kcal-lg">${kg1(last)}</div><div class="mu" style="text-align:right">kg</div></div>
+ const seg=`<div class="seg" id="lbSeg" style="margin:4px 0 10px"><button data-lv="logbook" class="${lbView!=="photos"?"on":""}">Logbook</button><button data-lv="photos" class="${lbView==="photos"?"on":""}">Photos</button></div>`;
+ const bindSeg=()=>document.querySelectorAll("#lbSeg [data-lv]").forEach(b=>b.onclick=()=>{lbView=b.dataset.lv;cmpPick=null;renderMeasure()});
+ if(lbView==="photos"){$("#v-measure").innerHTML=seg+photosViewHTML(picsBy)+`<div style="height:72px"></div><button type="button" class="fab" id="bwAdd" aria-label="Add weigh-in">+</button>`;bindSeg();bindPhotosView(picsBy);$("#bwAdd").onclick=()=>weighIn();return}
+ $("#v-measure").innerHTML=`${seg}<div class="card"><div class="mu">Now</div><div class="rowb" style="align-items:flex-end"><div class="kcal-lg">${kg1(last)}</div><div class="mu" style="text-align:right">kg</div></div>
   <div class="mu" style="margin-top:4px">${lost>=0?"−"+kg1(lost)+" kg since start":"+"+kg1(-lost)+" kg since start"} (${kg1(START_WEIGHT)} kg on ${dmy(iso(START))})${goal!=null?` · goal ${kg1(goal)} kg · ${toGo<=0?"goal reached":kg1(toGo)+" kg to go"}`:""}</div>
   ${window.Chart?`<div style="height:160px;margin-top:10px"><canvas id="c5"></canvas></div>`:""}
   <button class="sm w" id="bwGoal">${goal!=null?"Edit weight goal":"Set a goal weight"}</button></div>
@@ -944,6 +988,7 @@ function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
  let carry=null;const kgPts=wSt.map(st=>{if(st.carryW!=null)carry=st.carryW;else if(st.lastW!=null)carry=st.lastW;return carry});
  if($("#c5")&&window.Chart)chart("c5",{type:"line",data:{labels:wks.map(m=>dmy(m).slice(0,5)),datasets:[{label:"kg",data:kgPts,borderColor:"#30d158",yAxisID:"y",spanGaps:true,tension:0.15,pointRadius:3,fill:false},...(goal!=null?[{label:"Goal",data:wks.map(()=>goal),borderColor:"#2f8cff",yAxisID:"y",borderDash:[6,4],pointRadius:0,fill:false}]:[]),{label:"kcal/day",data:wSt.map(st=>st.avgK),borderColor:"#ff9f0a",yAxisID:"y2",spanGaps:true,tension:0.15,pointRadius:3,borderDash:[4,3],fill:false}]},options:{plugins:{legend:{display:true,labels:{color:"#f2f2f7",boxWidth:10}}},scales:{y:{beginAtZero:false,ticks:{color:"#8e8e93"},title:{display:true,text:"kg",color:"#8e8e93"}},y2:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},ticks:{color:"#ff9f0a"},title:{display:true,text:"kcal/d",color:"#ff9f0a"}},x:{ticks:{color:"#8e8e93",maxRotation:0}}},animation:false}});
  $("#bwAdd").onclick=()=>weighIn();$("#bwGoal").onclick=setWeightGoal;
+ bindSeg();
  $("#v-measure").querySelectorAll("[data-bw]").forEach(b=>b.onclick=()=>weighIn(b.dataset.bw));
  $("#v-measure").querySelectorAll("[data-gap]").forEach(b=>b.onclick=()=>{lbGapsOpen.has(b.dataset.gap)?lbGapsOpen.delete(b.dataset.gap):lbGapsOpen.add(b.dataset.gap);renderMeasure()});
 }
