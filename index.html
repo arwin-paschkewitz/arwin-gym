@@ -96,7 +96,7 @@ button.lb-mo .n{margin-left:auto;font-weight:600;letter-spacing:0;font-size:12px
 .pad{display:grid;grid-template-columns:repeat(3,80px);gap:12px}.pad button{height:72px;font-size:26px;border-radius:50%}
 canvas{max-height:260px}
 table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px;border-bottom:1px solid #2a2a2c;text-align:left}
-.toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--ok);color:#000;padding:10px 18px;border-radius:20px;z-index:100;font-weight:600}
+.toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--ok);color:#000;padding:10px 18px;border-radius:20px;z-index:100;font-weight:600;max-width:calc(100% - 24px);text-align:center;line-height:1.35}
 /* active workout */
 #aw,.sheet{position:fixed;inset:0;background:var(--bg);overflow:auto;padding-bottom:120px}
 #aw{z-index:40}.sheet{z-index:60}
@@ -175,7 +175,7 @@ const parse=s=>{const[a,b,c]=s.split("-").map(Number);return new Date(a,b-1,c)};
 const weekOf=s=>Math.floor((parse(s)-START)/(7*864e5))+1;
 const wkLabel=w=>w<1?"Pre-program":w>WEEKS?"Week "+w+" (past plan)":"Week "+w+" of "+WEEKS;
 const dmy=s=>s.split("-").reverse().join("/");
-function toast(m){const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),1800)}
+function toast(m,ms){const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),ms||1800)}
 async function sha(s){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 const pinHash=()=>localStorage.getItem("gym.pinHash")||DEFAULT_PIN_HASH;
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -186,7 +186,7 @@ const fmtT=ms=>{const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=M
 let pinBuf="";
 function buildPad(){const p=$("#pad");["1","2","3","4","5","6","7","8","9","⌫","0","✓"].forEach(k=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>pinKey(k);p.appendChild(b)})}
 async function pinKey(k){if(k==="⌫")pinBuf=pinBuf.slice(0,-1);else if(k==="✓")return tryPin();else if(pinBuf.length<8)pinBuf+=k;$("#pinDots").textContent="•".repeat(pinBuf.length);if(pinBuf.length===4)tryPin()}
-async function tryPin(){if((await sha(pinBuf))===pinHash()){appPin=pinBuf;loadTips().then(()=>{if(active&&!$("#aw").classList.contains("hid"))renderActive()});$("#lock").classList.add("hid");sessionStorage.setItem("gym.unlocked","1");$("#pinErr").textContent=""}else{$("#pinErr").textContent="Wrong PIN"}pinBuf="";$("#pinDots").textContent=""}
+async function tryPin(){if((await sha(pinBuf))===pinHash()){appPin=pinBuf;loadTips().then(()=>{if(active&&!$("#aw").classList.contains("hid"))renderActive()});$("#lock").classList.add("hid");sessionStorage.setItem("gym.unlocked","1");$("#pinErr").textContent="";if(typeof onGymUnlocked==="function")onGymUnlocked()}else{$("#pinErr").textContent="Wrong PIN"}pinBuf="";$("#pinDots").textContent=""}
 document.addEventListener("keydown",e=>{if($("#lock").classList.contains("hid"))return;if(/^\d$/.test(e.key))pinKey(e.key);else if(e.key==="Backspace")pinKey("⌫");else if(e.key==="Enter")pinKey("✓")});
 // ---- How-to diagrams (HOWTO_V1) ----
 const SEAT=[["r",36,70,28,5],["l",42,75,42,100]],BACK=[["r",34,30,5,42]],RAIL=[["l",24,58,24,100],["l",18,58,30,58]];
@@ -862,7 +862,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Volume by muscle group</b><div style="height:240px"><canvas id="c2"></canvas></div></div>
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
- <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><button class="w" id="imWbtn">⬆️ Import weight CSV</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
+ <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><button class="w" id="imWbtn">⬆️ Import weight CSV</button><button class="w" id="awHelp">🔄 Automatic weights</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
  <div class="lbl">SETTINGS</div><div class="card"><div class="rowb"><b>🍎 Food goals</b><span class="mu">${fGoals().kcal} kcal · P${fGoals().p} F${fGoals().f} C${fGoals().c} Fi${fGoals().fib??30}</span></div><button class="w" id="fGoalsP">Set calorie &amp; macro goals</button></div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="sayC" ${sayOn?"checked":""} style="width:24px;min-height:24px"> Say a phrase at 10 seconds left</label><input id="sayT" value="${esc(sayTxt)}" placeholder="Get ready fatty" aria-label="Phrase" style="margin-top:6px;font-size:16px"><button class="w" id="sayTest">🗣 Test phrase</button><div style="margin-top:14px"><b>Audio cues</b><div class="mu">Use your own recording or an audio file at each point. Default keeps the built-in sound. Clips are saved on this phone and work offline.</div><div id="cueBox">${cueRowsHTML()}</div></div><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="autoF" ${LS.get("gym.autoFin",true)?"checked":""} style="width:24px;min-height:24px"> Auto-finish a workout after 30 min with no activity</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div style="margin-top:12px"><b>Lock-screen notification</b><div class="mu" id="pushSt" style="margin:4px 0"></div><button class="w" id="pushBtn"></button></div><div style="margin-top:12px"><b>When a buzzer plays over music</b><div class="seg" id="amSeg" style="margin-top:8px">${[["mix","Play over"],["duck","Pause & resume (beta)"],["loud","Loud"]].map(([k,n])=>`<button data-am="${k}" class="${audMode===k?"on":""}">${n}</button>`).join("")}</div><div class="mu">Play over (default): buzz mixes on top of your music. Pause &amp; resume (beta, iOS 17+): song pauses for the buzz and may carry on; if you hear no buzz or the song stays paused, go back to Play over. Both follow the silent switch and only sound while the app is open, so turn on the lock-screen notification for alerts in other apps. Loud: ignores the silent switch but stops your music.</div></div><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
@@ -883,6 +883,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
  $("#imJ").onclick=()=>$("#imF").click();
  $("#imWbtn").onclick=()=>pickWeightCSV();
+ $("#awHelp").onclick=()=>autoWeightHelp();
  $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;if(Array.isArray(d.photos))for(const p of d.photos)await putPhoto(p);if(d.food){if(d.food.log)fLog=d.food.log;if(d.food.water)fWater=d.food.water;if(Array.isArray(d.food.custom))fCustom=d.food.custom;if(Array.isArray(d.food.fav))fFav=d.food.fav;if(d.food.goals)LS.set("food.goals",d.food.goals);if(d.food.fast)fFast=d.food.fast;fSave()}migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
  $("#rst").onclick=()=>{if(!confirm("Reset exercises and templates to the default program? Your logged workouts are kept; custom exercises and edits are removed."))return;lib=defLib();tpl=defTpl();saveLib();mergeStrong(1);toast("Program reset ✓");renderProfile()};
  $("#pSave").onclick=async()=>{const o=$("#pOld").value,n=$("#pNew").value;if((await sha(o))!==pinHash())return alert("Current PIN is wrong");if(!/^\d{4}$/.test(n))return alert("New PIN must be 4 digits");if(n!==$("#pNew2").value)return alert("New PINs don't match");localStorage.setItem("gym.pinHash",await sha(n));toast("PIN changed ✓");renderProfile();setTimeout(()=>alert("Coach tips use your old PIN until Sarah updates them."),50)};
@@ -892,6 +893,74 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
 // ---- Weight logbook (Happy Scale-style; recorded values only, no moving average) ----
 const dayDiff=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
 const kg1=n=>(+n).toFixed(1);
+
+let pendingAddWeightToast=null,pendingAddWeightView=false;
+const ADDWEIGHT_KEYS=["addweight","weight","kg","date","day","bodyfat","fat","body_fat","muscle","musclemass"];
+function parseKgInput(v){if(v==null)return null;const raw=String(v).trim();if(!raw||raw==="--")return null;
+ const lb=/lbs?\b/i.test(raw);let s=raw.replace(/[^\d.,-]/g,"");
+ if(/,\d{1,2}$/.test(s)&&!s.includes("."))s=s.replace(",",".");else s=s.replace(/,/g,"");
+ let n=parseFloat(s);if(!Number.isFinite(n))return null;if(lb)n*=0.45359237;return n}
+function parseFatInput(v){const n=parseKgInput(v);if(n==null)return null;const f=(n>0&&n<=1)?n*100:n;if(f<2||f>80)return null;return Math.round(f*10)/10}
+function parseMuscleInput(v){const n=parseKgInput(v);if(n==null||n<=0||n>200)return null;return Math.round(n*100)/100}
+function addWeightParamsFromSearch(s){const p=new URLSearchParams(String(s||"").replace(/^[#?]/,""));const raw=p.get("addweight")||p.get("weight")||p.get("kg");if(raw==null||String(raw).trim()==="")return null;return{kg:raw,date:p.get("date")||p.get("day")||"",fat:p.get("bodyfat")||p.get("fat")||p.get("body_fat")||"",muscle:p.get("muscle")||p.get("musclemass")||""}}
+function readAddWeightParams(){const q=addWeightParamsFromSearch(location.search);if(q)return q;const h=(location.hash||"").replace(/^#/,"").replace(/^\/?/,"");return h?addWeightParamsFromSearch(h):null}
+function stripAddWeightUrl(){try{const u=new URL(location.href);ADDWEIGHT_KEYS.forEach(k=>u.searchParams.delete(k));if(u.hash&&/addweight=|(?:^|[?&#])(?:weight|kg|date|bodyfat|fat|muscle)=/.test(u.hash)){const hp=new URLSearchParams((u.hash||"").replace(/^#/,"").replace(/^\?/,"").replace(/^\//,""));ADDWEIGHT_KEYS.forEach(k=>hp.delete(k));const left=hp.toString();u.hash=left?left:""}const next=u.pathname+u.search+u.hash;if(next!==location.pathname+location.search+location.hash)history.replaceState({},"",next)}catch(e){}}
+function applyWeightEntry(raw){if(!raw)return null;let kg=parseKgInput(raw.kg);if(kg==null||kg<20||kg>400)return{invalid:true,message:"Couldn't add that weight from the link."};
+ const date=isoDateCell(raw.date||"")||iso(new Date());kg=+kg1(kg);
+ const fat=raw.fat?parseFatInput(raw.fat):null,muscle=raw.muscle?parseMuscleInput(raw.muscle):null;
+ const existing=(weights||[]).find(w=>w.date===date);
+ if(existing)return{skipped:true,date,kg:existing.kg,message:"Already have "+kg1(existing.kg)+" kg for "+dmy(date)+" — left as is"};
+ const row={date,kg};if(fat!=null)row.fat=fat;if(muscle!=null)row.muscle=muscle;
+ weights=(weights||[]).concat(row).sort((a,b)=>a.date.localeCompare(b.date));save();
+ return{added:true,date,kg,message:"Saved "+kg1(kg)+" kg for "+dmy(date)}}
+function revealAddWeight(r){if(!r)return;if(r.added)pendingAddWeightView=true;toast(r.message,3500);
+ const unlocked=!$("#lock")||$("#lock").classList.contains("hid");
+ if(unlocked){if(pendingAddWeightView&&typeof show==="function"){pendingAddWeightView=false;show("measure")}}
+ else pendingAddWeightToast=r.message}
+function flushAddWeightUI(){if(pendingAddWeightView&&typeof show==="function"){pendingAddWeightView=false;show("measure")}
+ if(pendingAddWeightToast){toast(pendingAddWeightToast,3500);pendingAddWeightToast=null}}
+function onGymUnlocked(){flushAddWeightUI()}
+function consumeAddWeightUrl(){const p=readAddWeightParams();if(!p)return;const r=applyWeightEntry(p);stripAddWeightUrl();revealAddWeight(r)}
+function ingestWeightText(text){text=String(text||"").trim();if(!text)return null;let p=null;
+ const m=text.match(/^GYMWEIGHT\|(\d{4}-\d{2}-\d{2})\|([^\s|]+)(?:\|([^\s|]*))?(?:\|([^\s|]*))?/i);
+ if(m)p={date:m[1],kg:m[2],fat:m[3]||"",muscle:m[4]||""};
+ else if(/addweight=|[?&#](?:weight|kg)=/.test(text)){try{const u=/^https?:/i.test(text)?new URL(text):null;const src=u?(u.search.replace(/^\?/,"")+"&"+u.hash.replace(/^#/,"").replace(/^\?/,"")):text.replace(/^[^?#]*[?#]/,"");p=addWeightParamsFromSearch(src)}catch(e){p=null}}
+ return p?applyWeightEntry(p):null}
+async function addWeightFromShortcuts(){if(!navigator.clipboard||!navigator.clipboard.readText)return alert("This browser can't read the clipboard. Open the add-weight link in Safari instead.");
+ let text="";try{text=await navigator.clipboard.readText()}catch(e){return alert("Couldn't read the clipboard. Tap Allow Paste, or open the weight link in Safari.")}
+ const r=ingestWeightText(text);
+ if(!r)return alert("No weigh-in found on the clipboard. Run the Add gym weight Shortcut first.");
+ revealAddWeight(r)}
+function autoWeightHelp(){
+ const stand=typeof isStandalone==="function"?isStandalone():!!(matchMedia("(display-mode: standalone)").matches||navigator.standalone);
+ const base=(location.origin||"https://arwin-paschkewitz.github.io")+(location.pathname||"/arwin-gym/");
+ const warn=stand?`<div class="card" style="border:1px solid #ff9f0a;margin:0 0 12px"><b>You're in the Home Screen app</b><div class="mu">This copy of the log is separate from Safari. A Shortcut that opens a link saves the weight in Safari, not here. For hands-off add, use Gym Log in Safari (export JSON here first, then import it in Safari, and use Safari from then on). To stay on the Home Screen icon, have the Shortcut copy the link and use Add from Shortcuts below.</div></div>`:`<div class="mu" style="margin:0 0 12px">You're in Safari — this is the setup that can add today's weight automatically.</div>`;
+ const sh=openSheet("Automatic weights", `${warn}
+  <div class="mu">The RENPHO scale syncs to the RENPHO app, then to Apple Health. A Shortcut reads today's latest Weight from Health and opens a link like <span style="word-break:break-all">${esc(base)}?addweight=105.5&amp;date=2026-11-13</span>. Gym Log adds it only if that day is empty, then shows a short confirmation. It never overwrites a weight you already entered.</div>
+  <div class="lbl">1. RENPHO → HEALTH</div>
+  <div class="mu">In the RENPHO app, turn on writing <b>Weight</b> (and <b>Body Fat</b> if you want it) to Apple Health. Weigh yourself as usual so a sample appears in the Health app.</div>
+  <div class="lbl">2. BUILD THE SHORTCUT</div>
+  <div class="mu">A ready-made .shortcut file can't be created from here — Apple only signs those on an iPhone or Mac. Build it once:</div>
+  <div class="mu">1. Open <b>Shortcuts</b> and tap <b>+</b>.<br>
+  2. <b>Add Action</b> → search <b>Find Health Samples</b>. Set the type to <b>Weight</b> (sometimes called <b>Body Mass</b>).<br>
+  3. Add a filter: <b>Start Date</b> is <b>today</b>. Sort by <b>Start Date</b>, order <b>Latest First</b>, <b>Limit</b> 1.<br>
+  4. Add <b>If</b> → Health Samples <b>has any value</b>. Put the next actions inside the If.<br>
+  5. <b>Get Details of Health Sample</b> → <b>Value</b>. Add another <b>Get Details of Health Sample</b> → <b>Start Date</b>.<br>
+  6. <b>Format Date</b>: the Start Date, custom format <b>yyyy-MM-dd</b>.<br>
+  7. <b>URL</b>: <span style="word-break:break-all">${esc(base)}?addweight=</span> then insert the <b>Value</b> variable, then <b>&amp;date=</b>, then the formatted date. (Optional: a second Find Health Samples for <b>Body Fat Percentage</b>, same day, and append <b>&amp;bodyfat=</b> plus its Value.)<br>
+  8. <b>Open URLs</b> (that URL).<br>
+  9. Name it <b>Add gym weight</b>. Run it once and allow access to Weight (and Body Fat if used).</div>
+  <div class="lbl">3. RUN IT EACH MORNING</div>
+  <div class="mu">In Shortcuts, add an automation (Automation tab, or <b>Automation</b> on the shortcut in iOS 27): <b>Time of Day</b> → <b>7:00 AM</b> → <b>Daily</b> → <b>Run Immediately</b> (don't ask first) → run <b>Add gym weight</b>. You can also pin the shortcut and run it after a weigh-in.<br><br>
+  Optional extra: <b>App</b> is closed → choose <b>RENPHO</b> → <b>Run Immediately</b> → the same shortcut. Add a <b>Wait</b> of about 15 seconds first, so Health has time to sync. 7:00 AM is the more reliable default (your morning weigh-ins are usually earlier).</div>
+  <div class="lbl">SAFARI VS HOME SCREEN</div>
+  <div class="mu">On iPhone, the Home Screen web app and Safari do not share saved data. <b>Open URLs</b> always opens Safari, so auto-add is reliable if you use Gym Log in Safari day to day. If the phone is locked at 7:00, Safari may open when you next unlock it.<br><br>
+  If you keep the Home Screen icon: add <b>Copy to Clipboard</b> of that same URL in the Shortcut, then <b>Open App</b> → <b>Gym Log</b>. After you unlock, tap <b>Add from Shortcuts</b> and <b>Allow Paste</b>. There is no fully hands-off on-device path into the Home Screen app without a server.</div>
+  <button class="p w" id="awClipNow">Add from Shortcuts now</button>
+  <button class="ghost w" data-close>Done</button>`);
+ const b=sh.querySelector("#awClipNow");if(b)b.onclick=()=>{sh.remove();addWeightFromShortcuts()};
+ sh.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>sh.remove())
+}
 
 function parseCSVText(text){text=String(text||"").replace(/^\uFEFF/,"");const rows=[];let row=[],cur="",q=false;
  for(let i=0;i<text.length;i++){const c=text[i];
@@ -1060,14 +1129,16 @@ async function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
   <div class="mu" style="margin-top:4px">${lost>=0?"−"+kg1(lost)+" kg since start":"+"+kg1(-lost)+" kg since start"} (${kg1(START_WEIGHT)} kg on ${dmy(iso(START))})${goal!=null?` · goal ${kg1(goal)} kg · ${toGo<=0?"goal reached":kg1(toGo)+" kg to go"}`:""}</div>
   ${window.Chart?`<div style="height:160px;margin-top:10px"><canvas id="c5"></canvas></div>`:""}
   <button class="sm w" id="bwGoal">${goal!=null?"Edit weight goal":"Set a goal weight"}</button>
-  <button class="sm w" id="bwImp">Import weight CSV</button></div>
+  <button class="sm w" id="bwImp">Import weight CSV</button>
+  <button class="sm w" id="bwClip">Add from Shortcuts</button>
+  <button class="sm w" id="bwAuto">Set up automatic weights</button></div>
   ${weekSumHTML()}
   ${months.map(mo=>{const open=isMoOpen(mo.mk),nW=mo.rows.filter(it=>it.type==="day"&&wBy.has(it.date)).length;const head=`<button type="button" class="lbl lb-mo" data-mo="${mo.mk}" aria-expanded="${open}">${open?"▾":"▸"} ${esc(mo.label)}${open?"":`<span class="n">· ${nW} weigh-in${nW===1?"":"s"}</span>`}</button>`;return open?head+`<div class="lb"><div class="lb-h"><span>Date</span><span>Recorded</span><span>Weekly rate</span><span>Food</span><span>Training</span></div>${mo.rows.map(it=>it.type==="gap"?gapRow(it):dayRow(it)).join("")}</div>`:head}).join("")}
   <div style="height:72px"></div><button type="button" class="fab" id="bwAdd" aria-label="Add weigh-in">+</button>`;
  const wks=weeksBack(8),wSt=wks.map(weekStats);
  let carry=null;const kgPts=wSt.map(st=>{if(st.carryW!=null)carry=st.carryW;else if(st.lastW!=null)carry=st.lastW;return carry});
  if($("#c5")&&window.Chart)chart("c5",{type:"line",data:{labels:wks.map(m=>dmy(m).slice(0,5)),datasets:[{label:"kg",data:kgPts,borderColor:"#30d158",yAxisID:"y",spanGaps:true,tension:0.15,pointRadius:3,fill:false},...(goal!=null?[{label:"Goal",data:wks.map(()=>goal),borderColor:"#2f8cff",yAxisID:"y",borderDash:[6,4],pointRadius:0,fill:false}]:[]),{label:"kcal/day",data:wSt.map(st=>st.avgK),borderColor:"#ff9f0a",yAxisID:"y2",spanGaps:true,tension:0.15,pointRadius:3,borderDash:[4,3],fill:false}]},options:{plugins:{legend:{display:true,labels:{color:"#f2f2f7",boxWidth:10}}},scales:{y:{beginAtZero:false,ticks:{color:"#8e8e93"},title:{display:true,text:"kg",color:"#8e8e93"}},y2:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},ticks:{color:"#ff9f0a"},title:{display:true,text:"kcal/d",color:"#ff9f0a"}},x:{ticks:{color:"#8e8e93",maxRotation:0}}},animation:false}});
- $("#bwAdd").onclick=()=>weighIn();$("#bwGoal").onclick=setWeightGoal;$("#bwImp").onclick=()=>pickWeightCSV();
+ $("#bwAdd").onclick=()=>weighIn();$("#bwGoal").onclick=setWeightGoal;$("#bwImp").onclick=()=>pickWeightCSV();$("#bwClip").onclick=()=>addWeightFromShortcuts();$("#bwAuto").onclick=()=>autoWeightHelp();
  bindSeg();
  $("#v-measure").querySelectorAll("[data-mo]").forEach(b=>b.onclick=()=>{lbMoOpen[b.dataset.mo]=!isMoOpen(b.dataset.mo);renderMeasure()});
  $("#v-measure").querySelectorAll("[data-bw]").forEach(b=>b.onclick=()=>weighIn(b.dataset.bw));
@@ -1107,6 +1178,8 @@ if(!window.isSecureContext||!crypto.subtle){$("#pinErr").textContent="PIN check 
 tick=setInterval(()=>{tickFn();pushSync()},250);
 show("workout");loadTips().then(()=>{if(active&&!$("#aw").classList.contains("hid"))renderActive()});
 if(active)renderActive();
+consumeAddWeightUrl();
+addEventListener("pageshow",()=>consumeAddWeightUrl());
 // ---- Food diary (MyFitnessPal-style) ----
 /* FOODS: [name, serving, kcal, protein g, carbs g, fat g, fibre g] per serving. Approximate AU values (FSANZ/AUSNUT-style). */
 const FOODS=[["Weet-Bix (2 biscuits)","30 g",107,3.6,20,0.4,3.4],["Rolled oats, dry","40 g",150,5,24,3.5,4],["Porridge made with water","1 cup",160,5.5,27,3.5,4],["Muesli, natural","60 g",230,6,36,7,5.5],["Cornflakes","30 g",113,2,25,0.2,0.9],["Nutri-Grain","30 g",115,4,24,0.3,0.8],["Granola","50 g",230,5,30,10,4],
