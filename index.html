@@ -77,6 +77,9 @@ nav button{flex:1;background:none;border-radius:0;min-height:62px;color:var(--mu
 .lb-tag.g-rehab{background:rgba(255,255,255,.1);color:#c7c7cc}
 .lb-tag.g-other{background:var(--card2);color:#d0d0d4}
 .lb-note{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ac);margin-top:2px}
+.lb-fat{display:block;font-size:9px;color:var(--mu);font-weight:600;line-height:1.15;margin-top:1px;letter-spacing:-0.02em}
+button.lb-mo{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;color:var(--mu);font:inherit;font-size:13px;font-weight:700;letter-spacing:.06em;margin:18px 0 6px;padding:0;text-align:left;min-height:36px}
+button.lb-mo .n{margin-left:auto;font-weight:600;letter-spacing:0;font-size:12px;opacity:.85}
 .wksum-row{padding:8px 0;border-bottom:1px solid #2a2a2c}
 .wksum-row:last-child{border:0}
 .wksum-meta{font-size:12px;color:var(--mu);margin-top:2px}
@@ -859,7 +862,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Volume by muscle group</b><div style="height:240px"><canvas id="c2"></canvas></div></div>
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
- <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
+ <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><button class="w" id="imWbtn">⬆️ Import weight CSV</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
  <div class="lbl">SETTINGS</div><div class="card"><div class="rowb"><b>🍎 Food goals</b><span class="mu">${fGoals().kcal} kcal · P${fGoals().p} F${fGoals().f} C${fGoals().c} Fi${fGoals().fib??30}</span></div><button class="w" id="fGoalsP">Set calorie &amp; macro goals</button></div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="sayC" ${sayOn?"checked":""} style="width:24px;min-height:24px"> Say a phrase at 10 seconds left</label><input id="sayT" value="${esc(sayTxt)}" placeholder="Get ready fatty" aria-label="Phrase" style="margin-top:6px;font-size:16px"><button class="w" id="sayTest">🗣 Test phrase</button><div style="margin-top:14px"><b>Audio cues</b><div class="mu">Use your own recording or an audio file at each point. Default keeps the built-in sound. Clips are saved on this phone and work offline.</div><div id="cueBox">${cueRowsHTML()}</div></div><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="autoF" ${LS.get("gym.autoFin",true)?"checked":""} style="width:24px;min-height:24px"> Auto-finish a workout after 30 min with no activity</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div style="margin-top:12px"><b>Lock-screen notification</b><div class="mu" id="pushSt" style="margin:4px 0"></div><button class="w" id="pushBtn"></button></div><div style="margin-top:12px"><b>When a buzzer plays over music</b><div class="seg" id="amSeg" style="margin-top:8px">${[["mix","Play over"],["duck","Pause & resume (beta)"],["loud","Loud"]].map(([k,n])=>`<button data-am="${k}" class="${audMode===k?"on":""}">${n}</button>`).join("")}</div><div class="mu">Play over (default): buzz mixes on top of your music. Pause &amp; resume (beta, iOS 17+): song pauses for the buzz and may carry on; if you hear no buzz or the song stays paused, go back to Play over. Both follow the silent switch and only sound while the app is open, so turn on the lock-screen notification for alerts in other apps. Loud: ignores the silent switch but stops your music.</div></div><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.</div>`;
@@ -879,6 +882,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  bindCues(document);$("#fGoalsP").onclick=foodGoals;$("#sndTest").onclick=()=>{unlockAudio();vibNote();playTones(restSound==="beep"?"beep":"buzz")};
  $("#exC").onclick=()=>download("gym-log-"+iso(new Date())+".csv",toCSV(),"text/csv");
  $("#imJ").onclick=()=>$("#imF").click();
+ $("#imWbtn").onclick=()=>pickWeightCSV();
  $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;if(Array.isArray(d.photos))for(const p of d.photos)await putPhoto(p);if(d.food){if(d.food.log)fLog=d.food.log;if(d.food.water)fWater=d.food.water;if(Array.isArray(d.food.custom))fCustom=d.food.custom;if(Array.isArray(d.food.fav))fFav=d.food.fav;if(d.food.goals)LS.set("food.goals",d.food.goals);if(d.food.fast)fFast=d.food.fast;fSave()}migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
  $("#rst").onclick=()=>{if(!confirm("Reset exercises and templates to the default program? Your logged workouts are kept; custom exercises and edits are removed."))return;lib=defLib();tpl=defTpl();saveLib();mergeStrong(1);toast("Program reset ✓");renderProfile()};
  $("#pSave").onclick=async()=>{const o=$("#pOld").value,n=$("#pNew").value;if((await sha(o))!==pinHash())return alert("Current PIN is wrong");if(!/^\d{4}$/.test(n))return alert("New PIN must be 4 digits");if(n!==$("#pNew2").value)return alert("New PINs don't match");localStorage.setItem("gym.pinHash",await sha(n));toast("PIN changed ✓");renderProfile();setTimeout(()=>alert("Coach tips use your old PIN until Sarah updates them."),50)};
@@ -888,13 +892,86 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
 // ---- Weight logbook (Happy Scale-style; recorded values only, no moving average) ----
 const dayDiff=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
 const kg1=n=>(+n).toFixed(1);
+
+function parseCSVText(text){text=String(text||"").replace(/^\uFEFF/,"");const rows=[];let row=[],cur="",q=false;
+ for(let i=0;i<text.length;i++){const c=text[i];
+  if(q){if(c==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}else cur+=c}
+  else if(c==='"')q=true;
+  else if(c===","){row.push(cur);cur=""}
+  else if(c==="\n"||c==="\r"){if(c==="\r"&&text[i+1]==="\n")i++;row.push(cur);cur="";if(row.some(x=>String(x).trim()))rows.push(row);row=[]}
+  else cur+=c}
+ if(cur.length||row.length){row.push(cur);if(row.some(x=>String(x).trim()))rows.push(row)}
+ return rows}
+function normHead(h){return String(h||"").toLowerCase().replace(/[^a-z0-9]+/g,"")}
+function numish(v){if(v==null)return null;const s=String(v).trim();if(!s||s==="--"||s==="-"||/^n\/?a$/i.test(s))return null;const n=parseFloat(s.replace(/,/g,""));return Number.isFinite(n)?n:null}
+function isoDateCell(s){s=String(s||"").trim();let m=s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);if(m)return m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2);m=s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);if(m)return m[3]+"-"+("0"+m[1]).slice(-2)+"-"+("0"+m[2]).slice(-2);return null}
+function parseTimeCell(s){s=String(s||"").trim();const m=s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);if(!m)return "";return ("0"+m[1]).slice(-2)+":"+m[2]+":"+(m[3]||"00")}
+function detectWeightCSV(headers){const n=headers.map(normHead),has=k=>n.includes(k);
+ if(has("recorded")&&has("date"))return "happyscale";
+ if(has("date")&&(has("weightkg")||has("weight")||has("kg")||has("bodyweight")||has("recorded"))){
+  if(has("time")&&(has("no")||has("bodyfatpercentage")||has("bmi")||has("visceralfat")))return "renpho";
+  if(has("source")||has("bodyfatpercent")||has("musclemasskg"))return "merged";
+  if(has("time"))return "renpho";
+  return "generic"}
+ return null}
+function parseWeightCSV(text,name){const table=parseCSVText(text);if(!table.length)throw new Error((name||"File")+" is empty");
+ const headers=table[0],type=detectWeightCSV(headers);if(!type)throw new Error((name||"File")+" isn't a RENPHO or Happy Scale weight export");
+ const n=headers.map(normHead);const col=(...names)=>{for(const nm of names){const i=n.indexOf(nm);if(i>=0)return i}return -1};
+ const iDate=col("date"),iTime=col("time"),iSrc=col("source");
+ const iKg=col("weightkg","recorded","weight","kg","bodyweight");
+ const iFat=col("bodyfatpercentage","bodyfatpercent","bodyfat","fat","fatpercent");
+ const iMus=col("musclemasskg","musclemass","muscle");
+ const out=[];
+ for(let r=1;r<table.length;r++){const row=table[r],date=iDate>=0?isoDateCell(row[iDate]):null,kg=iKg>=0?numish(row[iKg]):null;
+  if(!date||kg==null||kg<=0||kg>400)continue;
+  let source=type==="happyscale"?"happyscale":(type==="renpho"?"renpho":"generic");
+  if(iSrc>=0){const sv=normHead(row[iSrc]);if(sv==="renpho")source="renpho";else if(sv==="happyscale"||sv==="happyscaleexport"||sv==="happy")source="happyscale"}
+  const rec={date,kg,source,file:name||""};
+  if(iTime>=0)rec.time=parseTimeCell(row[iTime]);
+  const fat=iFat>=0?numish(row[iFat]):null,mus=iMus>=0?numish(row[iMus]):null;
+  if(fat!=null)rec.fat=fat;if(mus!=null)rec.muscle=mus;
+  out.push(rec)}
+ if(!out.length)throw new Error((name||"File")+" had no usable weigh-ins");
+ return {type,rows:out}}
+function mergeImportDays(rows){const by={};
+ rows.filter(r=>r.source!=="renpho").forEach(r=>{if(!by[r.date])by[r.date]=r});
+ const ren={};rows.filter(r=>r.source==="renpho").forEach(r=>{(ren[r.date]=ren[r.date]||[]).push(r)});
+ Object.keys(ren).forEach(d=>{ren[d].sort((a,b)=>(a.time||"99:99:99").localeCompare(b.time||"99:99:99"));by[d]=ren[d][0]});
+ return by}
+function pickWeightCSV(){const inp=document.createElement("input");inp.type="file";inp.accept=".csv,text/csv,text/plain";inp.multiple=true;
+ inp.onchange=()=>{if(inp.files&&inp.files.length)importWeightFiles(inp.files)};inp.click()}
+async function importWeightFiles(fileList){const files=[...fileList].filter(Boolean);if(!files.length)return;
+ const all=[],errs=[];
+ for(const f of files){try{const text=await f.text();const {rows}=parseWeightCSV(text,f.name);rows.forEach(r=>all.push(r))}catch(e){errs.push(e.message||String(e))}}
+ const merged=mergeImportDays(all),dates=Object.keys(merged).sort();
+ const hsDays=new Set(all.filter(r=>r.source==="happyscale").map(r=>r.date));
+ const rpDays=new Set(all.filter(r=>r.source==="renpho").map(r=>r.date));
+ const overlap=[...hsDays].filter(d=>rpDays.has(d)).length;
+ const have=new Set((weights||[]).map(w=>w.date));
+ let added=0,skipped=0;const newOnes=[];
+ dates.forEach(d=>{if(have.has(d)){skipped++;return}const r=merged[d],row={date:d,kg:+kg1(r.kg)};if(r.fat!=null)row.fat=r.fat;if(r.muscle!=null)row.muscle=r.muscle;newOnes.push(row);added++});
+ if(newOnes.length){weights=weights.concat(newOnes).sort((a,b)=>a.date.localeCompare(b.date));save()}
+ const range=dates.length?dmy(dates[0])+" – "+dmy(dates[dates.length-1]):"—";
+ if(typeof renderMeasure==="function"&&view==="measure")renderMeasure();
+ else if(typeof renderProfile==="function"&&view==="profile")renderProfile();
+ const bits=[`Added ${added} day${added===1?"":"s"}.`,`Skipped ${skipped} day${skipped===1?"":"s"} already in the app.`];
+ if(dates.length)bits.push("Range: "+range+".");
+ if(rpDays.size)bits.push("RENPHO: "+rpDays.size+" day"+(rpDays.size===1?"":"s")+".");
+ if(hsDays.size)bits.push("Happy Scale: "+hsDays.size+" day"+(hsDays.size===1?"":"s")+".");
+ if(overlap)bits.push("Overlap (kept RENPHO): "+overlap+" day"+(overlap===1?"":"s")+".");
+ if(errs.length)bits.push("Issues: "+errs.join("; "));
+ if(!added&&!skipped&&!errs.length)bits.push("No weigh-ins found.");
+ const sh=openSheet("Import complete",`<div style="font-size:16px;line-height:1.5;margin-bottom:14px">${bits.map(esc).join("<br>")}</div><button class="p w" id="impDone">Done</button>`);
+ const done=$("#impDone");if(done)done.onclick=()=>sh.remove()}
+
 function weeklyRate(arr,i){const cur=arr[i];let best=null,bestDist=99;
  for(let j=i-1;j>=0;j--){const days=dayDiff(arr[j].date,cur.date);if(days<3)continue;if(days>16)break;const dist=Math.abs(days-7);if(dist<bestDist){best=arr[j];bestDist=dist}}
  if(!best)return null;const days=dayDiff(best.date,cur.date);return (cur.kg-best.kg)*7/days}
 function ratePill(r){if(r==null)return`<span class="mu">—</span>`;const flat=Math.abs(r)<0.05,up=r>0;return`<span class="wpill ${flat?"flat":up?"up":"down"}">${flat?"→":up?"↑":"↓"} ${Math.abs(r).toFixed(1)}</span>`}
 function weighIn(dateOrRow){const d0=typeof dateOrRow==="string"?dateOrRow:(dateOrRow&&dateOrRow.date)||iso(new Date());
  const existing=weights.find(w=>w.date===d0);const x=existing||{date:d0,kg:"",note:""};
- const s=openSheet(existing?"Edit weigh-in":"Add weigh-in",`<label>Date<input type="date" id="bwD" value="${esc(x.date)}"></label><label>Weight (kg)<input type="number" step="0.1" inputmode="decimal" id="bwK" value="${x.kg||""}"></label><label>Notes (optional)<input id="bwN" value="${esc(x.note||"")}" placeholder="e.g. morning, after walk"></label>
+ const comp=(x.fat!=null||x.muscle!=null)?`<div class="mu" style="margin:0 0 10px">${x.fat!=null?"Body fat "+(+x.fat).toFixed(1)+"%":""}${x.fat!=null&&x.muscle!=null?" · ":""}${x.muscle!=null?"Muscle "+(+x.muscle).toFixed(2)+" kg":""}</div>`:"";
+ const s=openSheet(existing?"Edit weigh-in":"Add weigh-in",`<label>Date<input type="date" id="bwD" value="${esc(x.date)}"></label><label>Weight (kg)<input type="number" step="0.1" inputmode="decimal" id="bwK" value="${x.kg||""}"></label><label>Notes (optional)<input id="bwN" value="${esc(x.note||"")}" placeholder="e.g. morning, after walk"></label>${comp}
   <div class="lbl">PHOTOS</div><div id="bwPics" class="pic-thumbs"></div><input type="file" id="bwPicF" accept="image/*" class="hid"><button type="button" class="ghost w" id="bwPicAdd">📷 Add photo</button><div class="mu">Up to 3 photos. Kept on this phone only — not included in the JSON export.</div>
   <button class="p w" id="bwS">Save</button>${existing?'<button class="d w" id="bwDel">Delete</button>':""}`);
  const close=s.querySelector("[data-close]");if(close)close.onclick=()=>{s.remove();renderMeasure()};
@@ -910,13 +987,14 @@ function weighIn(dateOrRow){const d0=typeof dateOrRow==="string"?dateOrRow:(date
  $("#bwK").focus();
  $("#bwS").onclick=async()=>{const kg=parseFloat($("#bwK").value),d=$("#bwD").value,note=$("#bwN").value.trim();if(!kg||!d)return alert("Enter a date and weight");
   if(d!==d0){try{const ps=await progOf(d0);for(const p of ps){await progDel(p.id);p.date=d;await progPut(p)}}catch(e){}}
-  weights=weights.filter(w=>w.date!==d&&w.date!==x.date);const row={date:d,kg:+kg1(kg)};if(note)row.note=note;weights.push(row);weights.sort((a,b)=>a.date.localeCompare(b.date));save();s.remove();renderMeasure()};
+  weights=weights.filter(w=>w.date!==d&&w.date!==x.date);const row={date:d,kg:+kg1(kg)};if(note)row.note=note;if(x.fat!=null)row.fat=x.fat;if(x.muscle!=null)row.muscle=x.muscle;weights.push(row);weights.sort((a,b)=>a.date.localeCompare(b.date));save();s.remove();renderMeasure()};
  if(existing)$("#bwDel").onclick=()=>{weights=weights.filter(w=>w.date!==existing.date);save();s.remove();renderMeasure()}}
 function setWeightGoal(){const cur=LS.get("gym.weightGoal",null);const s=openSheet("Weight goal",`<label>Goal weight (kg)<input type="number" step="0.1" inputmode="decimal" id="wg" value="${cur??""}"></label><button class="p w" id="wgS">Save goal</button>${cur?'<button class="ghost w" id="wgC">Clear goal</button>':""}`);
  $("#wgS").onclick=()=>{const v=parseFloat($("#wg").value);if(!v)return;LS.set("gym.weightGoal",+kg1(v));s.remove();renderMeasure()};
  const c=$("#wgC");if(c)c.onclick=()=>{localStorage.removeItem("gym.weightGoal");s.remove();renderMeasure()}}
 const shiftDate=(d,n)=>{const x=parse(d);x.setDate(x.getDate()+n);return iso(x)};
-let lbGapsOpen=new Set(),lbView="logbook",cmpPick=null;
+let lbGapsOpen=new Set(),lbView="logbook",cmpPick=null,lbMoOpen={};
+function isMoOpen(mk){if(Object.prototype.hasOwnProperty.call(lbMoOpen,mk))return lbMoOpen[mk];return mk>=shiftDate(iso(new Date()),-92).slice(0,7)}
 function earliestLogDate(){let d=iso(START);
  (weights||[]).forEach(w=>{if(w.date&&w.date<d)d=w.date});
  (sessions||[]).forEach(s=>{if(s.date&&s.date<d)d=s.date});
@@ -945,7 +1023,8 @@ function weekSumHTML(){const weeks=weeksBack(8).slice().reverse().map(weekStats)
  return`<div class="lbl">WEEKLY SNAPSHOT</div><div class="card">${weeks.map(row).join("")}</div>`}
 function lbItems(){const today=iso(new Date()),start=earliestLogDate(),days=[];
  for(let d=today;d>=start;d=shiftDate(d,-1))days.push(d);
- const empty=d=>!weights.some(w=>w.date===d)&&!lbHasFood(d)&&!(sessions||[]).some(s=>s.date===d);
+ const hasW=new Set((weights||[]).map(w=>w.date)),hasS=new Set((sessions||[]).map(s=>s.date));
+ const empty=d=>!hasW.has(d)&&!lbHasFood(d)&&!hasS.has(d);
  const items=[];let i=0;
  while(i<days.length){if(!empty(days[i])){items.push({type:"day",date:days[i]});i++;continue}
   let j=i;while(j<days.length&&empty(days[j]))j++;const n=j-i;
@@ -966,13 +1045,13 @@ async function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
  const goal=LS.get("gym.weightGoal",null),sorted=[...weights].sort((a,b)=>a.date.localeCompare(b.date));
  const last=sorted.length?sorted[sorted.length-1].kg:START_WEIGHT,lost=START_WEIGHT-last,toGo=goal!=null?last-goal:null;
  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
- const idxOf=d=>sorted.findIndex(w=>w.date===d);
+ const wBy=new Map(sorted.map(w=>[w.date,w])),idxOf=d=>wBy.has(d)?sorted.findIndex(w=>w.date===d):-1;
  const items=lbItems();let months=[],curM="";
- items.forEach(it=>{const d=it.type==="gap"?it.to:it.date,mk=d.slice(0,7);if(mk!==curM){curM=mk;const[y,m]=mk.split("-");months.push({label:MONTHS[+m-1]+" "+y,rows:[]})}months[months.length-1].rows.push(it)});
+ items.forEach(it=>{const d=it.type==="gap"?it.to:it.date,mk=d.slice(0,7);if(mk!==curM){curM=mk;const[y,m]=mk.split("-");months.push({mk,label:MONTHS[+m-1]+" "+y,rows:[]})}months[months.length-1].rows.push(it)});
  const startPt=!sorted.some(w=>w.date===iso(START));
  const labels=(startPt?[{date:iso(START),kg:START_WEIGHT},...sorted]:sorted);
- const dayRow=it=>{const d=it.date,w=weights.find(x=>x.date===d),dow=parse(d).getDay(),wknd=dow===0||dow===6,i=idxOf(d);
-  return`<button type="button" class="lb-row${wknd?" wknd":""}" data-bw="${d}"><div><div class="lb-day">${+d.slice(8)}</div><div class="lb-dow">${DAYS[dow]}</div>${w&&w.note?'<span class="lb-note" aria-label="Has note"></span>':""}${picsBy[d]&&picsBy[d].length?'<span class="lb-cam" aria-label="Has photo">📷</span>':""}</div><div class="${w?"lb-kg":"lb-kg none"}">${w?kg1(w.kg):"—"}</div><div>${w?ratePill(weeklyRate(sorted,i)):""}</div><div>${lbFoodCell(d)}</div><div>${lbTrainCell(d)}</div></button>`};
+ const dayRow=it=>{const d=it.date,w=wBy.get(d),dow=parse(d).getDay(),wknd=dow===0||dow===6,i=idxOf(d);
+  return`<button type="button" class="lb-row${wknd?" wknd":""}" data-bw="${d}"><div><div class="lb-day">${+d.slice(8)}</div><div class="lb-dow">${DAYS[dow]}</div>${w&&w.note?'<span class="lb-note" aria-label="Has note"></span>':""}${picsBy[d]&&picsBy[d].length?'<span class="lb-cam" aria-label="Has photo">📷</span>':""}</div><div class="${w?"lb-kg":"lb-kg none"}">${w?kg1(w.kg):"—"}${w&&w.fat!=null?`<span class="lb-fat">${(+w.fat).toFixed(1)}%</span>`:""}</div><div>${w?ratePill(weeklyRate(sorted,i)):""}</div><div>${lbFoodCell(d)}</div><div>${lbTrainCell(d)}</div></button>`};
  const gapRow=it=>`<button type="button" class="lb-row gap" data-gap="${it.key}">${it.n} days — no entries</button>`;
  const seg=`<div class="seg" id="lbSeg" style="margin:4px 0 10px"><button data-lv="logbook" class="${lbView!=="photos"?"on":""}">Logbook</button><button data-lv="photos" class="${lbView==="photos"?"on":""}">Photos</button></div>`;
  const bindSeg=()=>document.querySelectorAll("#lbSeg [data-lv]").forEach(b=>b.onclick=()=>{lbView=b.dataset.lv;cmpPick=null;renderMeasure()});
@@ -980,15 +1059,17 @@ async function renderMeasure(){charts.forEach(c=>c.destroy());charts=[];
  $("#v-measure").innerHTML=`${seg}<div class="card"><div class="mu">Now</div><div class="rowb" style="align-items:flex-end"><div class="kcal-lg">${kg1(last)}</div><div class="mu" style="text-align:right">kg</div></div>
   <div class="mu" style="margin-top:4px">${lost>=0?"−"+kg1(lost)+" kg since start":"+"+kg1(-lost)+" kg since start"} (${kg1(START_WEIGHT)} kg on ${dmy(iso(START))})${goal!=null?` · goal ${kg1(goal)} kg · ${toGo<=0?"goal reached":kg1(toGo)+" kg to go"}`:""}</div>
   ${window.Chart?`<div style="height:160px;margin-top:10px"><canvas id="c5"></canvas></div>`:""}
-  <button class="sm w" id="bwGoal">${goal!=null?"Edit weight goal":"Set a goal weight"}</button></div>
+  <button class="sm w" id="bwGoal">${goal!=null?"Edit weight goal":"Set a goal weight"}</button>
+  <button class="sm w" id="bwImp">Import weight CSV</button></div>
   ${weekSumHTML()}
-  ${months.map(mo=>`<div class="lbl">${esc(mo.label)}</div><div class="lb"><div class="lb-h"><span>Date</span><span>Recorded</span><span>Weekly rate</span><span>Food</span><span>Training</span></div>${mo.rows.map(it=>it.type==="gap"?gapRow(it):dayRow(it)).join("")}</div>`).join("")}
+  ${months.map(mo=>{const open=isMoOpen(mo.mk),nW=mo.rows.filter(it=>it.type==="day"&&wBy.has(it.date)).length;const head=`<button type="button" class="lbl lb-mo" data-mo="${mo.mk}" aria-expanded="${open}">${open?"▾":"▸"} ${esc(mo.label)}${open?"":`<span class="n">· ${nW} weigh-in${nW===1?"":"s"}</span>`}</button>`;return open?head+`<div class="lb"><div class="lb-h"><span>Date</span><span>Recorded</span><span>Weekly rate</span><span>Food</span><span>Training</span></div>${mo.rows.map(it=>it.type==="gap"?gapRow(it):dayRow(it)).join("")}</div>`:head}).join("")}
   <div style="height:72px"></div><button type="button" class="fab" id="bwAdd" aria-label="Add weigh-in">+</button>`;
  const wks=weeksBack(8),wSt=wks.map(weekStats);
  let carry=null;const kgPts=wSt.map(st=>{if(st.carryW!=null)carry=st.carryW;else if(st.lastW!=null)carry=st.lastW;return carry});
  if($("#c5")&&window.Chart)chart("c5",{type:"line",data:{labels:wks.map(m=>dmy(m).slice(0,5)),datasets:[{label:"kg",data:kgPts,borderColor:"#30d158",yAxisID:"y",spanGaps:true,tension:0.15,pointRadius:3,fill:false},...(goal!=null?[{label:"Goal",data:wks.map(()=>goal),borderColor:"#2f8cff",yAxisID:"y",borderDash:[6,4],pointRadius:0,fill:false}]:[]),{label:"kcal/day",data:wSt.map(st=>st.avgK),borderColor:"#ff9f0a",yAxisID:"y2",spanGaps:true,tension:0.15,pointRadius:3,borderDash:[4,3],fill:false}]},options:{plugins:{legend:{display:true,labels:{color:"#f2f2f7",boxWidth:10}}},scales:{y:{beginAtZero:false,ticks:{color:"#8e8e93"},title:{display:true,text:"kg",color:"#8e8e93"}},y2:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},ticks:{color:"#ff9f0a"},title:{display:true,text:"kcal/d",color:"#ff9f0a"}},x:{ticks:{color:"#8e8e93",maxRotation:0}}},animation:false}});
- $("#bwAdd").onclick=()=>weighIn();$("#bwGoal").onclick=setWeightGoal;
+ $("#bwAdd").onclick=()=>weighIn();$("#bwGoal").onclick=setWeightGoal;$("#bwImp").onclick=()=>pickWeightCSV();
  bindSeg();
+ $("#v-measure").querySelectorAll("[data-mo]").forEach(b=>b.onclick=()=>{lbMoOpen[b.dataset.mo]=!isMoOpen(b.dataset.mo);renderMeasure()});
  $("#v-measure").querySelectorAll("[data-bw]").forEach(b=>b.onclick=()=>weighIn(b.dataset.bw));
  $("#v-measure").querySelectorAll("[data-gap]").forEach(b=>b.onclick=()=>{lbGapsOpen.has(b.dataset.gap)?lbGapsOpen.delete(b.dataset.gap):lbGapsOpen.add(b.dataset.gap);renderMeasure()});
 }
