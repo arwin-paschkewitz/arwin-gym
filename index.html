@@ -95,6 +95,16 @@ button.lb-mo .n{margin-left:auto;font-weight:600;letter-spacing:0;font-size:12px
 .macros{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:13px;margin-top:10px}
 .macros b{color:var(--tx);font-variant-numeric:tabular-nums}
 .fast-badge{display:inline-block;background:rgba(191,90,242,.22);color:#bf5af2;border-radius:8px;font-size:12px;font-weight:800;padding:2px 8px}
+.f-chip{display:inline-block;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:800;line-height:1.2;vertical-align:middle}
+.f-chip.cheat,.fast-badge.cheat{background:rgba(255,55,95,.2);color:#ff375f}
+.f-chip.omc,.fast-badge.omc{background:rgba(50,173,230,.22);color:#64d2ff}
+.lb-chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.f-marks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.f-marks .f-mark,.f-marks .sm{flex:1 1 calc(33.33% - 6px);min-width:96px;padding:7px 6px;font-size:12px;font-weight:700}
+.f-marks.meal .sm{flex:1 1 calc(50% - 6px);min-width:88px}
+.f-mark.on.fast{background:rgba(191,90,242,.22);color:#bf5af2;border-color:transparent}
+.f-mark.on.cheat{background:rgba(255,55,95,.2);color:#ff375f;border-color:transparent}
+.f-mark.on.omc{background:rgba(50,173,230,.22);color:#64d2ff;border-color:transparent}
 .vol-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #2a2a2c}
 .vol-row:last-child{border:0}
 .hid{display:none!important}
@@ -878,7 +888,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  chart("c2",{type:"bar",data:{labels,datasets:groups.map((g,i)=>({label:g,backgroundColor:COLORS[i],data:wk.map(w=>Math.round(inW(w).filter(s=>s.group===g).reduce((a,s)=>a+vol(s),0)))}))},options:{scales:{x:{stacked:true,ticks:{color:"#8e8e93"}},y:{stacked:true,ticks:{color:"#8e8e93"},beginAtZero:true}}}});
  chart("c3",{type:"line",data:{labels,datasets:[{label:"Arm",data:wk.map(w=>avg(w,"armPain")),borderColor:"#ffb84f",spanGaps:true},{label:"Knee",data:wk.map(w=>avg(w,"kneePain")),borderColor:"#ff453a",spanGaps:true}]},options:{scales:{y:{min:0,max:10,ticks:{color:"#8e8e93"}},x:{ticks:{color:"#8e8e93"}}}}});
  chart("c4",{type:"line",data:{labels,datasets:rehab.map((x,i)=>({label:x.name.replace("Arm Rehab ",""),borderColor:COLORS[i%6],spanGaps:true,data:wk.map(w=>{const m=Math.max(0,...inW(w).flatMap(s=>s.ex.filter(e=>e.exId===x.id).flatMap(e=>e.sets.map(t=>t.w||0))));return m||null})}))}});
- $("#exJ").onclick=async()=>{let photos=[];try{photos=await allPhotos()}catch(e){}download("gym-log-"+iso(new Date())+".json",JSON.stringify({app:"gym-log",version:4,sessions,weights,lib,tpl,photos,food:{log:fLog,water:fWater,custom:fCustom,fav:fFav,goals:LS.get("food.goals",{}),fast:fFast}},null,2),"application/json")};
+ $("#exJ").onclick=async()=>{let photos=[];try{photos=await allPhotos()}catch(e){}download("gym-log-"+iso(new Date())+".json",JSON.stringify({app:"gym-log",version:5,sessions,weights,lib,tpl,photos,food:{log:fLog,water:fWater,custom:fCustom,fav:fFav,goals:LS.get("food.goals",{}),fast:fFast,marks:fMarks}},null,2),"application/json")};
  document.querySelectorAll("#sndSeg [data-snd]").forEach(b=>b.onclick=()=>{restSound=b.dataset.snd;if(restSound==="buzz")vibNote();LS.set("gym.sound",restSound);document.querySelectorAll("#sndSeg [data-snd]").forEach(x=>x.classList.toggle("on",x===b))});
  $("#askC").onchange=e=>LS.set("gym.askCoach",e.target.checked);$("#autoF").onchange=e=>{LS.set("gym.autoFin",e.target.checked);idlePush()};
  $("#phT").onchange=e=>{phoneT=e.target.checked;LS.set("gym.phoneT",phoneT);const r=$("#rest");if(r)r.innerHTML="";if(phoneT&&!LS.get("gym.phHelpSeen",false)){LS.set("gym.phHelpSeen",true);phoneHelp()}};$("#phHelp").onclick=phoneHelp;
@@ -891,7 +901,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  $("#imJ").onclick=()=>$("#imF").click();
  $("#imWbtn").onclick=()=>pickWeightCSV();
  $("#awHelp").onclick=()=>autoWeightHelp();
- $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;if(Array.isArray(d.photos))for(const p of d.photos)await putPhoto(p);if(d.food){if(d.food.log)fLog=d.food.log;if(d.food.water)fWater=d.food.water;if(Array.isArray(d.food.custom))fCustom=d.food.custom;if(Array.isArray(d.food.fav))fFav=d.food.fav;if(d.food.goals)LS.set("food.goals",d.food.goals);if(d.food.fast)fFast=d.food.fast;fSave()}migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
+ $("#imF").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.sessions))throw 0;if(!confirm("Replace current data with "+d.sessions.length+" workouts from file?"))return;sessions=d.sessions;weights=Array.isArray(d.weights)?d.weights:[];if(Array.isArray(d.lib))lib=d.lib;if(Array.isArray(d.tpl))tpl=d.tpl;if(Array.isArray(d.photos))for(const p of d.photos)await putPhoto(p);if(d.food){if(d.food.log)fLog=d.food.log;if(d.food.water)fWater=d.food.water;if(Array.isArray(d.food.custom))fCustom=d.food.custom;if(Array.isArray(d.food.fav))fFav=d.food.fav;if(d.food.goals)LS.set("food.goals",d.food.goals);if(d.food.fast)fFast=d.food.fast;if(d.food.marks)fMarks=d.food.marks;fSave()}migrate();save();saveLib();toast("Imported ✓");renderProfile()}catch(x){alert("Not a valid Gym Log JSON file")}};
  $("#rst").onclick=()=>{if(!confirm("Reset exercises and templates to the default program? Your logged workouts are kept; custom exercises and edits are removed."))return;lib=defLib();tpl=defTpl();saveLib();mergeStrong(1);toast("Program reset ✓");renderProfile()};
  $("#pSave").onclick=async()=>{const o=$("#pOld").value,n=$("#pNew").value;if((await sha(o))!==pinHash())return alert("Current PIN is wrong");if(!/^\d{4}$/.test(n))return alert("New PIN must be 4 digits");if(n!==$("#pNew2").value)return alert("New PINs don't match");localStorage.setItem("gym.pinHash",await sha(n));toast("PIN changed ✓");renderProfile();setTimeout(()=>alert("Coach tips use your old PIN until Sarah updates them."),50)};
  $("#lockNow").onclick=()=>{sessionStorage.removeItem("gym.unlocked");$("#lock").classList.remove("hid")};
@@ -1078,10 +1088,24 @@ function earliestLogDate(){let d=iso(START);
  (sessions||[]).forEach(s=>{if(s.date&&s.date<d)d=s.date});
  if(typeof fLog!=="undefined")Object.keys(fLog||{}).forEach(k=>{if(k<d)d=k});
  if(typeof fFast!=="undefined")Object.keys(fFast||{}).forEach(k=>{if(k<d)d=k});
+ if(typeof fMarks!=="undefined")Object.keys(fMarks||{}).forEach(k=>{if(k<d)d=k});
  return d}
 function lbHasFood(d){try{return typeof fHasFood==="function"&&(fHasFood(d)||(typeof fDayLogged==="function"&&fDayLogged(d)))}catch(e){return false}}
 function openFoodDay(d){fDay=d;if(typeof show==="function")show("food")}
-function lbFoodCell(d){try{if(typeof fFastDay==="function"&&(fFastDay(d)||(typeof fDayLogged==="function"&&fDayLogged(d)&&!fHasFood(d))))return`<button type="button" class="lb-foodtap" data-food="${d}" aria-label="Open food for ${d}"><span class="lb-fast">Fast</span></button>`;const t=typeof fTot==="function"?fTot(d):null;if(t&&t.kcal){const g=(typeof fGoals==="function"?fGoals():FG_DEF||{}).kcal||2200;return`<button type="button" class="lb-foodtap" data-food="${d}" aria-label="Open food for ${d}"><div class="lb-sub lb-food ${t.kcal>g?"over":"under"}">${Math.round(t.kcal).toLocaleString("en-AU")}</div><div class="lb-mac">P${Math.round(t.p)} C${Math.round(t.c)}<br>F${Math.round(t.f)} Fi${Math.round(t.fib)}</div></button>`}}catch(e){}
+function lbFoodChips(d){const chips=[];
+ try{if(typeof fFastDay==="function"&&(fFastDay(d)||(typeof fDayLogged==="function"&&fDayLogged(d)&&!fHasFood(d))))chips.push(`<span class="lb-fast">Fast</span>`);
+  else{if(typeof fCheatDay==="function"&&fCheatDay(d))chips.push(`<span class="f-chip cheat">Cheat day</span>`);
+   else if(typeof fHasCheatMeal==="function"&&fHasCheatMeal(d))chips.push(`<span class="f-chip cheat">Cheat meal</span>`);
+   if(typeof fOmcDay==="function"&&(fOmcDay(d)||(typeof fHasOmcMeal==="function"&&fHasOmcMeal(d))))chips.push(`<span class="f-chip omc">OMC</span>`)}}catch(e){}
+ return chips.join("")}
+function lbFoodCell(d){const wrap=(inner,label)=>`<button type="button" class="lb-foodtap" data-food="${d}" aria-label="${esc(label)}">${inner}</button>`;
+ try{const chips=lbFoodChips(d),chipRow=chips?`<div class="lb-chips">${chips}</div>`:"";
+  const isFast=typeof fFastDay==="function"&&(fFastDay(d)||(typeof fDayLogged==="function"&&fDayLogged(d)&&!fHasFood(d)));
+  if(isFast)return wrap(`<span class="lb-fast">Fast</span>`,"Open food for "+d);
+  const t=typeof fTot==="function"?fTot(d):null;
+  const g=(typeof fGoals==="function"?fGoals():FG_DEF||{}).kcal||2200;
+  const cals=t&&t.kcal?`<div class="lb-sub lb-food ${t.kcal>g?"over":"under"}">${Math.round(t.kcal).toLocaleString("en-AU")}</div><div class="lb-mac">P${Math.round(t.p)} C${Math.round(t.c)}<br>F${Math.round(t.f)} Fi${Math.round(t.fib)}</div>`:"";
+  if(cals||chips)return wrap(cals+chipRow,"Open food for "+d)}catch(e){}
  return`<button type="button" class="lb-addfood" data-food="${d}" aria-label="Add food for ${d}">+ Add</button>`}
 function lbTrainClass(name,group){const s=(group||name||"").toLowerCase();if(/chest/.test(s))return"g-chest";if(/leg/.test(s))return"g-legs";if(/back/.test(s))return"g-back";if(/shoulder|core/.test(s))return"g-shoulders";if(/calisthen|balance/.test(s))return"g-calisthenics";if(/rehab|arm/.test(s))return"g-rehab";return"g-other"}
 function lbTrainCell(d){const list=(sessions||[]).filter(s=>s.date===d);if(!list.length)return"";const names=[],seen=new Set();list.forEach(s=>{const n=s.day||s.group||s.name||"Workout";if(!seen.has(n)){seen.add(n);names.push({n,g:s.group||n})}});const extra=names.length-1;return`<span class="lb-tag ${lbTrainClass(names[0].n,names[0].g)}">${esc(names[0].n)}${extra>0?" +"+extra:""}</span>`}
@@ -1210,16 +1234,28 @@ const FOODS=[["Weet-Bix (2 biscuits)","30 g",107,3.6,20,0.4,3.4],["Rolled oats, 
 ["Whey protein shake (water)","1 scoop (30 g)",120,24,3,1.5,0],["Whey shake with milk","1 scoop + 250 ml lite",245,33,15.5,5,0],["Coffee, flat white (full cream)","regular",120,6,9,6.5,0],["Coffee, latte (skim)","regular",85,8,12,0.3,0],["Cappuccino","regular",100,5,8,5,0],["Long black","regular",5,0.3,0,0,0],["Iced coffee (Farmers Union)","600 ml",400,20,60,9,0],["Tea with milk","1 cup",20,1,1.5,1,0],["Orange juice","250 ml",110,2,24,0.3,0.5],["Coca-Cola","375 ml can",160,0,40,0,0],["Coke Zero / diet soft drink","375 ml",1,0,0,0,0],["Energy drink (Red Bull)","250 ml",115,0,27,0,0],["Sports drink (Gatorade)","600 ml",150,0,36,0,0],["Beer, full strength","375 ml",150,1.5,11,0,0],["Beer, mid strength","375 ml",115,1.5,9,0,0],["Wine, red/white","150 ml glass",125,0.1,3.5,0,0],["Spirits + soft drink","1 can (375 ml)",250,0,30,0,0],["Kombucha","330 ml",45,0,10,0,0]];
 const FMEALS=["Breakfast","Lunch","Dinner","Snacks"];
 const FG_DEF={kcal:2200,p:180,c:200,f:70,fib:30,water:3000};
-let fLog=LS.get("food.log",{}),fWater=LS.get("food.water",{}),fCustom=LS.get("food.custom",[]),fFav=LS.get("food.fav",[]),fFast=LS.get("food.fast",{});
+let fLog=LS.get("food.log",{}),fWater=LS.get("food.water",{}),fCustom=LS.get("food.custom",[]),fFav=LS.get("food.fav",[]),fFast=LS.get("food.fast",{}),fMarks=LS.get("food.marks",{});
 let fDay=null;const fGoals=()=>Object.assign({},FG_DEF,LS.get("food.goals",{}));
-const fSave=()=>{LS.set("food.log",fLog);LS.set("food.water",fWater);LS.set("food.custom",fCustom);LS.set("food.fav",fFav);LS.set("food.fast",fFast)};
+const fSave=()=>{LS.set("food.log",fLog);LS.set("food.water",fWater);LS.set("food.custom",fCustom);LS.set("food.fav",fFav);LS.set("food.fast",fFast);LS.set("food.marks",fMarks)};
 const fFastDay=d=>!!(fFast[d]&&fFast[d].day);
 const fFastMeal=(d,m)=>!!(fFast[d]&&(fFast[d].day||(fFast[d].meals&&fFast[d].meals[m])));
 const fHasFood=(d,m)=>(fLog[d]||[]).some(e=>!m||e.meal===m);
-const fDayLogged=d=>fHasFood(d)||fFastDay(d)||!!(fFast[d]&&fFast[d].meals&&Object.keys(fFast[d].meals).length);
-function fSetDayFast(d,on){if(on){fFast[d]=fFast[d]||{meals:{}};fFast[d].day=true;fFast[d].meals=fFast[d].meals||{};FMEALS.forEach(m=>{if(!fHasFood(d,m))fFast[d].meals[m]=true})}
+const fHasMarks=d=>!!(fMarks[d]&&(fMarks[d].cheat||fMarks[d].omc||(fMarks[d].meals&&Object.keys(fMarks[d].meals).length)));
+const fDayLogged=d=>fHasFood(d)||fFastDay(d)||!!(fFast[d]&&fFast[d].meals&&Object.keys(fFast[d].meals).length)||fHasMarks(d);
+const fCheatDay=d=>!!(fMarks[d]&&fMarks[d].cheat);
+const fOmcDay=d=>!!(fMarks[d]&&fMarks[d].omc);
+const fMarkMeal=(d,m,k)=>!!(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m]&&fMarks[d].meals[m][k]);
+const fHasCheatMeal=d=>!fCheatDay(d)&&FMEALS.some(m=>fMarkMeal(d,m,"cheat"));
+const fHasOmcMeal=d=>FMEALS.some(m=>fMarkMeal(d,m,"omc"));
+function fPruneMarks(d){const x=fMarks[d];if(!x)return;if(x.meals){Object.keys(x.meals).forEach(m=>{const ev=x.meals[m];if(!ev||!(ev.cheat||ev.omc))delete x.meals[m]});if(!Object.keys(x.meals).length)delete x.meals}if(!x.cheat&&!x.omc&&!x.meals)delete fMarks[d]}
+function fClearDayMarks(d,keys){if(!fMarks[d])return;keys.forEach(k=>delete fMarks[d][k]);if(fMarks[d].meals)FMEALS.forEach(m=>{if(fMarks[d].meals[m])keys.forEach(k=>delete fMarks[d].meals[m][k])});fPruneMarks(d)}
+function fSetDayFast(d,on){if(on){fFast[d]=fFast[d]||{meals:{}};fFast[d].day=true;fFast[d].meals=fFast[d].meals||{};FMEALS.forEach(m=>{if(!fHasFood(d,m))fFast[d].meals[m]=true});fClearDayMarks(d,["cheat","omc"])}
  else if(fFast[d]){delete fFast[d].day;fFast[d].meals={};if(!Object.keys(fFast[d].meals).length)delete fFast[d]}fSave()}
-function fSetMealFast(d,m,on){fFast[d]=fFast[d]||{meals:{}};fFast[d].meals=fFast[d].meals||{};if(on)fFast[d].meals[m]=true;else{delete fFast[d].meals[m];if(fFast[d].day)fFast[d].day=false}if(!fFast[d].day&&!Object.keys(fFast[d].meals).length)delete fFast[d];fSave()}
+function fSetMealFast(d,m,on){fFast[d]=fFast[d]||{meals:{}};fFast[d].meals=fFast[d].meals||{};if(on){fFast[d].meals[m]=true;if(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m]){delete fMarks[d].meals[m].cheat;delete fMarks[d].meals[m].omc}fPruneMarks(d)}else{delete fFast[d].meals[m];if(fFast[d].day)fFast[d].day=false}if(!fFast[d].day&&!Object.keys(fFast[d].meals).length)delete fFast[d];fSave()}
+function fSetDayCheat(d,on){if(on){fSetDayFast(d,false);fMarks[d]=fMarks[d]||{};fMarks[d].cheat=true;delete fMarks[d].omc;if(fMarks[d].meals)FMEALS.forEach(m=>{if(fMarks[d].meals[m])delete fMarks[d].meals[m].omc})}else if(fMarks[d])delete fMarks[d].cheat;fPruneMarks(d);fSave()}
+function fSetDayOmc(d,on){if(on){fSetDayFast(d,false);fMarks[d]=fMarks[d]||{};fMarks[d].omc=true;delete fMarks[d].cheat}else if(fMarks[d]){delete fMarks[d].omc;if(fMarks[d].meals)FMEALS.forEach(m=>{if(fMarks[d].meals[m])delete fMarks[d].meals[m].omc})}fPruneMarks(d);fSave()}
+function fSetMealCheat(d,m,on){if(on){fSetMealFast(d,m,false);fMarks[d]=fMarks[d]||{};fMarks[d].meals=fMarks[d].meals||{};fMarks[d].meals[m]=fMarks[d].meals[m]||{};fMarks[d].meals[m].cheat=true;delete fMarks[d].meals[m].omc}else if(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m])delete fMarks[d].meals[m].cheat;fPruneMarks(d);fSave()}
+function fSetMealOmc(d,m,on){if(on){fSetMealFast(d,m,false);fSetDayFast(d,false);fMarks[d]=fMarks[d]||{};fMarks[d].meals=fMarks[d].meals||{};FMEALS.forEach(x=>{if(x!==m&&fMarks[d].meals[x])delete fMarks[d].meals[x].omc});fMarks[d].meals[m]=fMarks[d].meals[m]||{};fMarks[d].meals[m].omc=true;delete fMarks[d].meals[m].cheat;fMarks[d].omc=true;delete fMarks[d].cheat}else if(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m])delete fMarks[d].meals[m].omc;fPruneMarks(d);fSave()}
 function fLastFoodTime(){let t=0;Object.keys(fLog).forEach(d=>(fLog[d]||[]).forEach(e=>{const x=+e.t||parse(d).getTime();if(x>t)t=x}));return t||null}
 function fFastStreak(){let n=0,d=iso(new Date());if(!fFastDay(d)&&!FMEALS.every(m=>fFastMeal(d,m)&&!fHasFood(d,m))){const y=parse(d);y.setDate(y.getDate()-1);d=iso(y)}
  for(;;){if(!(fFastDay(d)||(FMEALS.every(m=>fFastMeal(d,m)||fHasFood(d,m))&&!fHasFood(d)&&fDayLogged(d))))break;n++;const x=parse(d);x.setDate(x.getDate()-1);d=iso(x)}return n}
@@ -1243,23 +1279,29 @@ function renderFood(){if(!fDay)fDay=iso(new Date());const d=fDay,g=fGoals(),t=fT
  <div class="card"><div class="kcal-lg">${Math.round(t.kcal)}</div><div class="mu">kcal of ${g.kcal} goal · <b style="color:${left<0?"var(--bad)":"var(--tx)"}">${left<0?Math.abs(left)+" over":left+" left"}</b></div>
  <div style="height:8px;background:var(--card2);border-radius:4px;overflow:hidden;margin:10px 0 0"><div style="height:100%;width:${pct}%;background:${left<0?"var(--bad)":"var(--ok)"}"></div></div>
  <div class="macros"><div>Protein <b>${Math.round(t.p)}</b><span class="mu"> / ${g.p} g</span></div><div>Fat <b>${Math.round(t.f)}</b><span class="mu"> / ${g.f} g</span></div><div>Carbs <b>${Math.round(t.c)}</b><span class="mu"> / ${g.c} g</span></div><div>Fibre <b>${Math.round(t.fib)}</b><span class="mu"> / ${g.fib} g</span></div></div>
- <div class="rowb" style="margin-top:12px"><button class="sm" id="fDayFast">${fFastDay(d)?"✓ Fasting day · Undo":"Mark day as fasting"}</button>${showFastInfo||streak?`<span class="mu">${[hrs!=null&&(fFastDay(d)||!fHasFood(d))?hrs+"h since last food":"",streak?streak+"-day fasting streak":""].filter(Boolean).join(" · ")}</span>`:""}</div></div>
+ <div class="f-marks"><button class="sm f-mark${fFastDay(d)?" on fast":""}" id="fDayFast">${fFastDay(d)?"✓ Fasting day":"Mark as fasted"}</button><button class="sm f-mark${fCheatDay(d)?" on cheat":""}" id="fDayCheat">${fCheatDay(d)?"✓ Cheat day":"Mark as cheat day"}</button><button class="sm f-mark${fOmcDay(d)?" on omc":""}" id="fDayOmc">${fOmcDay(d)?"✓ One Meal Clean":"One Meal Clean"}</button></div>${showFastInfo||streak?`<div class="mu" style="margin-top:8px">${[hrs!=null&&(fFastDay(d)||!fHasFood(d))?hrs+"h since last food":"",streak?streak+"-day fasting streak":""].filter(Boolean).join(" · ")}</div>`:""}</div>
  <div class="row"><button class="p" id="fScan">📷 Scan food</button><button class="ghost" id="fBar">▥ Barcode</button></div>`;
  FMEALS.forEach(m=>{const es=(fLog[d]||[]).map((e,i)=>({e,i})).filter(x=>x.e.meal===m),mt=fMealTot(d,m),fast=fFastMeal(d,m)&&!es.length;
-  h+=`<div class="card"><div class="rowb"><b>${m}</b>${fast?`<span class="fast-badge">Fasting</span>`:`<span class="mu">${Math.round(mt.kcal)} kcal</span>`}</div>
-  ${fast?"":es.length?`<div class="mu" style="margin:-2px 0 6px">${fMacroTxt(mt)}</div>`:""}
+  const ch=fMarkMeal(d,m,"cheat"),om=fMarkMeal(d,m,"omc");
+  const badges=`${fast?`<span class="fast-badge">Fasting</span>`:""}${ch?`<span class="fast-badge cheat">Cheat meal</span>`:""}${om?`<span class="fast-badge omc">OMC</span>`:""}`;
+  h+=`<div class="card"><div class="rowb"><b>${m}</b>${badges||(!fast?`<span class="mu">${Math.round(mt.kcal)} kcal</span>`:"")}</div>
+  ${fast?"":es.length?`<div class="mu" style="margin:-2px 0 6px">${fMacroTxt(mt)}${!badges?"":" · "+Math.round(mt.kcal)+" kcal"}</div>`:""}
   ${es.map(({e,i})=>`<div class="li" data-fe="${i}" style="min-height:48px;padding:8px 0"><div><div>${esc(e.name)}</div><div class="mu">${(e.qty||1)!=1?e.qty+" × ":""}${esc(e.serving)} · ${fMacroTxt(e,e.qty||1)}</div></div><b>${Math.round(e.kcal*(e.qty||1))}</b></div>`).join("")}
-  ${fast?`<button class="sm w" data-funfast="${m}">Undo fasting</button>`:`<div class="row"><button class="sm" data-fadd="${m}">＋ Add food</button>${es.length?"":`<button class="ghost sm" data-ffast="${m}">Fasting</button>`}</div>`}</div>`});
+  ${fast?`<div class="f-marks meal"><button class="sm f-mark on fast" data-funfast="${m}">✓ Fasting</button></div>`:`<div class="f-marks meal"><button class="sm" data-fadd="${m}">＋ Add food</button>${es.length?"":`<button class="ghost sm f-mark" data-ffast="${m}">Fasting</button>`}<button class="sm f-mark${fMarkMeal(d,m,"cheat")?" on cheat":""}" data-fcheat="${m}">${fMarkMeal(d,m,"cheat")?"✓ Cheat meal":"Mark as cheat meal"}</button><button class="sm f-mark${om?" on omc":""}" data-fomc="${m}">${om?"✓ OMC":"OMC"}</button></div>`}</div>`});
  h+=`<div class="card"><div class="rowb"><b>💧 Water</b><span class="mu">${w} / ${g.water} ml</span></div><div style="height:8px;background:var(--card2);border-radius:4px;overflow:hidden;margin:8px 0"><div style="height:100%;width:${Math.min(100,w/g.water*100)}%;background:#64d2ff"></div></div><div class="row"><button class="sm" data-w="-250">−250</button><button class="sm" data-w="250">+250 ml</button><button class="sm" data-w="600">+600 ml</button></div></div>
  <button class="ghost w" id="fGoalsB">🎯 Calorie &amp; macro goals</button>`;
  $("#v-food").innerHTML=h;
  const mv=n=>{const x=parse(fDay);x.setDate(x.getDate()+n);fDay=iso(x);renderFood()};
  $("#fPrev").onclick=()=>mv(-1);$("#fNext").onclick=()=>mv(1);$("#fHist").onclick=foodHistory;$("#fGoalsB").onclick=foodGoals;
  $("#fDayFast").onclick=()=>{fSetDayFast(d,!fFastDay(d));renderFood()};
+ $("#fDayCheat").onclick=()=>{fSetDayCheat(d,!fCheatDay(d));renderFood()};
+ $("#fDayOmc").onclick=()=>{fSetDayOmc(d,!fOmcDay(d));renderFood()};
  $("#v-food").querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{fWater[d]=Math.max(0,(fWater[d]||0)+ +b.dataset.w);fSave();renderFood()});
  $("#v-food").querySelectorAll("[data-fadd]").forEach(b=>b.onclick=()=>foodAdd(b.dataset.fadd));
  $("#v-food").querySelectorAll("[data-ffast]").forEach(b=>b.onclick=()=>{fSetMealFast(d,b.dataset.ffast,true);renderFood()});
  $("#v-food").querySelectorAll("[data-funfast]").forEach(b=>b.onclick=()=>{fSetMealFast(d,b.dataset.funfast,false);renderFood()});
+ $("#v-food").querySelectorAll("[data-fcheat]").forEach(b=>b.onclick=()=>{fSetMealCheat(d,b.dataset.fcheat,!fMarkMeal(d,b.dataset.fcheat,"cheat"));renderFood()});
+ $("#v-food").querySelectorAll("[data-fomc]").forEach(b=>b.onclick=()=>{fSetMealOmc(d,b.dataset.fomc,!fMarkMeal(d,b.dataset.fomc,"omc"));renderFood()});
  $("#v-food").querySelectorAll("[data-fe]").forEach(r=>r.onclick=()=>foodEdit(+r.dataset.fe));
  $("#fScan").onclick=()=>foodScan(defMeal());$("#fBar").onclick=()=>foodBarcode(defMeal());}
 const defMeal=()=>{const h=new Date().getHours();return h<10?"Breakfast":h<14?"Lunch":h<17?"Snacks":"Dinner"};
@@ -1299,7 +1341,7 @@ function foodGoals(){const g=fGoals();const s=openSheet("Food goals",`<label>Dai
  $("#gS").onclick=()=>{LS.set("food.goals",{kcal:+$("#gK").value||FG_DEF.kcal,p:+$("#gP").value||0,c:+$("#gC").value||0,f:+$("#gF").value||0,fib:+$("#gFi").value||FG_DEF.fib,water:+$("#gW").value||FG_DEF.water});s.remove();toast("Goals saved ✓");if(view==="food")renderFood();else if(view==="profile")renderProfile()}}
 function foodHistory(){const g=fGoals();let rows="",sum={kcal:0,p:0,c:0,f:0,fib:0},n=0,nFast=0;
  for(let k=6;k>=0;k--){const d=iso(new Date(Date.now()-k*864e5)),t=fTot(d),w=fWater[d]||0,logged=fDayLogged(d),fast=fFastDay(d)||(logged&&!fHasFood(d));if(logged){n++;if(fast)nFast++;Object.keys(sum).forEach(x=>sum[x]+=t[x])}
-  rows+=`<div class="card" style="padding:10px 14px"><div class="rowb"><b>${DAYS[parse(d).getDay()]} ${dmy(d).slice(0,5)}</b>${fast?`<span class="fast-badge">Fasting</span>`:`<span>${Math.round(t.kcal)} <span class="mu">/ ${g.kcal} kcal</span></span>`}</div><div style="height:6px;background:var(--card2);border-radius:3px;overflow:hidden;margin:6px 0"><div style="height:100%;width:${Math.min(100,t.kcal/g.kcal*100)}%;background:${t.kcal>g.kcal?"var(--bad)":"var(--ok)"}"></div></div><div class="mu">${fast?"Logged as fasting":`P ${Math.round(t.p)} · F ${Math.round(t.f)} · C ${Math.round(t.c)} · Fi ${Math.round(t.fib)} g · 💧 ${w} ml`}</div></div>`}
+  rows+=`<div class="card" style="padding:10px 14px"><div class="rowb"><b>${DAYS[parse(d).getDay()]} ${dmy(d).slice(0,5)}</b>${fast?`<span class="fast-badge">Fasting</span>`:`<span>${Math.round(t.kcal)} <span class="mu">/ ${g.kcal} kcal</span></span>`}${fCheatDay(d)?` <span class="f-chip cheat">Cheat day</span>`:fHasCheatMeal(d)?` <span class="f-chip cheat">Cheat meal</span>`:""}${fOmcDay(d)?` <span class="f-chip omc">OMC</span>`:""}</div><div style="height:6px;background:var(--card2);border-radius:3px;overflow:hidden;margin:6px 0"><div style="height:100%;width:${Math.min(100,t.kcal/g.kcal*100)}%;background:${t.kcal>g.kcal?"var(--bad)":"var(--ok)"}"></div></div><div class="mu">${fast?"Logged as fasting":`P ${Math.round(t.p)} · F ${Math.round(t.f)} · C ${Math.round(t.c)} · Fi ${Math.round(t.fib)} g · 💧 ${w} ml`}</div></div>`}
  openSheet("Last 7 days",`<div class="card"><b>Daily average</b> <span class="mu">(${n} logged day${n===1?"":"s"}${nFast?` · ${nFast} fasting`:""})</span><div style="font-size:22px;font-weight:800;margin-top:4px">${n?Math.round(sum.kcal/n):0} kcal</div><div class="mu">P ${n?Math.round(sum.p/n):0} · F ${n?Math.round(sum.f/n):0} · C ${n?Math.round(sum.c/n):0} · Fi ${n?Math.round(sum.fib/n):0} g</div></div>${rows}`)}
 /* Open Food Facts (free, no key). Falls back gracefully offline. */
 const offMap=p=>{const n=p.nutriments||{},sq=parseFloat(p.serving_quantity),per=sq>0?sq/100:1;const kcal=n["energy-kcal_serving"]??(n["energy-kcal_100g"]!=null?n["energy-kcal_100g"]*per:(n["energy_100g"]||0)/4.184*per);
