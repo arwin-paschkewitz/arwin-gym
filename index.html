@@ -177,7 +177,7 @@ input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 // PIN is stored only as SHA-256 hash. Privacy lock only - not real security.
 const DEFAULT_PIN_HASH="1d27ca12704e713bb23a54ae2f77a3850bb74d34afd943fd2483a57a05d725cb";
 const START=new Date(2026,9,26);const WEEKS=12;const START_WEIGHT=105.3;
-const APP_BUILD="2026.11.14.2";
+const APP_BUILD="2026.11.14.3";
 const E=(name,sets,reps,o={})=>Object.assign({name,sets,reps},o);
 const PROGRAM={
 1:{name:"Chest",group:"Chest",ex:[E("Chest Press Machine",3,"10"),E("Incline DB Press",3,"10"),E("Pec Deck/Cable Fly",3,"12"),E("Arm Rehab Band Tricep Pushdown",2,"15",{rehab:1}),E("Arm Rehab Wrist Curl (1-2kg)",2,"15",{rehab:1})]},
@@ -1100,14 +1100,14 @@ function earliestLogDate(){let d=iso(START);
 function lbHasFood(d){try{return typeof fHasFood==="function"&&(fHasFood(d)||(typeof fDayLogged==="function"&&fDayLogged(d)))}catch(e){return false}}
 function openFoodDay(d){fDay=d;if(typeof show==="function")show("food")}
 function lbFoodChips(d){const chips=[];
- try{if(typeof fIsFasted==="function"&&fIsFasted(d))chips.push(`<span class="lb-fast">Fast</span>`);
+ try{if(typeof fIsFasted==="function"&&fIsFasted(d))chips.push(`<span class="lb-fast">Fasted</span>`);
   if(typeof fCheatDay==="function"&&fCheatDay(d))chips.push(`<span class="f-chip cheat">Cheat day</span>`);
   else if(typeof fHasCheatMeal==="function"&&fHasCheatMeal(d))chips.push(`<span class="f-chip cheat">Cheat meal</span>`);
   if(typeof fOmcDay==="function"&&(fOmcDay(d)||(typeof fHasOmcMeal==="function"&&fHasOmcMeal(d))))chips.push(`<span class="f-chip omc">One meal clean</span>`)}catch(e){}
  return chips.join("")}
 function lbFoodCell(d){const wrap=(inner,label)=>`<button type="button" class="lb-foodtap" data-food="${d}" aria-label="${esc(label)}">${inner}</button>`;
  try{const chips=lbFoodChips(d),chipRow=chips?`<div class="lb-chips">${chips}</div>`:"";
-  if(typeof fIsFasted==="function"&&fIsFasted(d))return wrap(`<span class="lb-fast">Fast</span>`,"Open food for "+d);
+  if(typeof fIsFasted==="function"&&fIsFasted(d))return wrap(`<span class="lb-fast">Fasted</span>`,"Open food for "+d);
   const t=typeof fTot==="function"?fTot(d):null;
   const g=(typeof fGoals==="function"?fGoals():FG_DEF||{}).kcal||2200;
   const cals=t&&t.kcal?`<div class="lb-sub lb-food ${t.kcal>g?"over":"under"}">${Math.round(t.kcal).toLocaleString("en-AU")}</div><div class="lb-mac">P${Math.round(t.p)} C${Math.round(t.c)}<br>F${Math.round(t.f)} Fi${Math.round(t.fib)}</div>`:"";
