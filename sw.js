@@ -1,5 +1,5 @@
-// v2026.11.14.3 · Gym Log SW: network-first documents, clear old caches, rest-end push
-const BUILD="2026.11.14.3";
+// v2026.11.14.4 · Gym Log SW: network-first documents, clear old caches, rest-end push
+const BUILD="2026.11.14.4";
 self.addEventListener("install",e=>e.waitUntil(self.skipWaiting()));
 self.addEventListener("activate",e=>e.waitUntil((async()=>{
   try{const keys=await caches.keys();await Promise.all(keys.map(k=>caches.delete(k)))}catch(_){}

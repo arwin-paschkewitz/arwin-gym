@@ -101,7 +101,7 @@ button.lb-mo .n{margin-left:auto;font-weight:600;letter-spacing:0;font-size:12px
 .lb-chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;align-items:flex-start}
 .lb-foodtap .f-chip,.lb-foodtap .lb-fast{max-width:100%}
 .f-marks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.f-marks .f-mark,.f-marks .sm{flex:1 1 calc(33.33% - 6px);min-width:96px;padding:7px 6px;font-size:12px;font-weight:700}
+.f-marks .f-mark,.f-marks .sm{flex:1 1 calc(50% - 6px);min-width:96px;padding:7px 6px;font-size:12px;font-weight:700}
 .f-marks.meal .sm{flex:1 1 calc(50% - 6px);min-width:88px}
 .f-mark.on.fast{background:rgba(191,90,242,.22);color:#bf5af2;border-color:transparent}
 .f-mark.on.cheat{background:rgba(255,55,95,.2);color:#ff375f;border-color:transparent}
@@ -177,7 +177,7 @@ input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 // PIN is stored only as SHA-256 hash. Privacy lock only - not real security.
 const DEFAULT_PIN_HASH="1d27ca12704e713bb23a54ae2f77a3850bb74d34afd943fd2483a57a05d725cb";
 const START=new Date(2026,9,26);const WEEKS=12;const START_WEIGHT=105.3;
-const APP_BUILD="2026.11.14.3";
+const APP_BUILD="2026.11.14.4";
 const E=(name,sets,reps,o={})=>Object.assign({name,sets,reps},o);
 const PROGRAM={
 1:{name:"Chest",group:"Chest",ex:[E("Chest Press Machine",3,"10"),E("Incline DB Press",3,"10"),E("Pec Deck/Cable Fly",3,"12"),E("Arm Rehab Band Tricep Pushdown",2,"15",{rehab:1}),E("Arm Rehab Wrist Curl (1-2kg)",2,"15",{rehab:1})]},
@@ -1254,7 +1254,8 @@ const fSave=()=>{LS.set("food.log",fLog);LS.set("food.water",fWater);LS.set("foo
 const fCheatDay=d=>!!(fMarks[d]&&fMarks[d].cheat);
 const fOmcDay=d=>!!(fMarks[d]&&fMarks[d].omc);
 const fMarkMeal=(d,m,k)=>!!(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m]&&fMarks[d].meals[m][k]);
-const fHasCheatMeal=d=>!fCheatDay(d)&&FMEALS.some(m=>fMarkMeal(d,m,"cheat"));
+const fCheatMealDay=d=>!!(fMarks[d]&&fMarks[d].cheatMeal);
+const fHasCheatMeal=d=>!fCheatDay(d)&&(fCheatMealDay(d)||FMEALS.some(m=>fMarkMeal(d,m,"cheat")));
 const fHasOmcMeal=d=>FMEALS.some(m=>fMarkMeal(d,m,"omc"));
 const fHasTag=d=>!!(fCheatDay(d)||fOmcDay(d)||fHasCheatMeal(d)||fHasOmcMeal(d));
 function fNormFast(d){const x=fFast[d];if(x===true||x===1||x==="fast"||x==="fasted")return{day:true,meals:{}};return x&&typeof x==="object"?x:null}
@@ -1262,20 +1263,21 @@ function fFastDay(d){if(fHasTag(d))return false;const x=fNormFast(d);return !!(x
 function fFastMeal(d,m){if(fHasTag(d)||fMarkMeal(d,m,"cheat")||fMarkMeal(d,m,"omc"))return false;const x=fNormFast(d);if(!x)return false;if(x.day)return true;return !!(x.meals&&x.meals[m])}
 const fHasFood=(d,m)=>(fLog[d]||[]).some(e=>!m||e.meal===m);
 function fIsFasted(d){try{if(fHasTag(d))return false;if(fHasFood(d))return false;if(fFastDay(d))return true;const x=fNormFast(d);return !!(x&&x.meals&&Object.keys(x.meals).length)}catch(e){return false}}
-const fHasMarks=d=>!!(fMarks[d]&&(fMarks[d].cheat||fMarks[d].omc||(fMarks[d].meals&&Object.keys(fMarks[d].meals).length)));
+const fHasMarks=d=>!!(fMarks[d]&&(fMarks[d].cheat||fMarks[d].cheatMeal||fMarks[d].omc||(fMarks[d].meals&&Object.keys(fMarks[d].meals).length)));
 const fDayLogged=d=>fHasFood(d)||fFastDay(d)||!!(fNormFast(d)&&fNormFast(d).meals&&Object.keys(fNormFast(d).meals).length)||fHasMarks(d);
-function fPruneMarks(d){const x=fMarks[d];if(!x)return;if(x.meals){Object.keys(x.meals).forEach(m=>{const ev=x.meals[m];if(!ev||!(ev.cheat||ev.omc))delete x.meals[m]});if(!Object.keys(x.meals).length)delete x.meals}if(!x.cheat&&!x.omc&&!x.meals)delete fMarks[d]}
+function fPruneMarks(d){const x=fMarks[d];if(!x)return;if(x.meals){Object.keys(x.meals).forEach(m=>{const ev=x.meals[m];if(!ev||!(ev.cheat||ev.omc))delete x.meals[m]});if(!Object.keys(x.meals).length)delete x.meals}if(!x.cheat&&!x.cheatMeal&&!x.omc&&!x.meals)delete fMarks[d]}
 function fClearDayMarks(d,keys){if(!fMarks[d])return;keys.forEach(k=>delete fMarks[d][k]);if(fMarks[d].meals)FMEALS.forEach(m=>{if(fMarks[d].meals[m])keys.forEach(k=>delete fMarks[d].meals[m][k])});fPruneMarks(d)}
 function fClearAllFast(d){if(fFast&&fFast[d]!=null)delete fFast[d];
  try{const legacy=LS.get("food.fasted",null);if(legacy&&typeof legacy==="object"&&legacy[d]!=null){delete legacy[d];if(Object.keys(legacy).length)LS.set("food.fasted",legacy);else try{localStorage.removeItem("food.fasted")}catch(e){}}}catch(e){}
  (fLog[d]||[]).forEach(e=>{if(e&&typeof e==="object"){delete e.fasted;delete e.fast;delete e.fasting}})}
-function fSetDayFast(d,on){if(on){fFast[d]=(fFast[d]&&typeof fFast[d]==="object")?fFast[d]:{meals:{}};fFast[d].day=true;fFast[d].meals=fFast[d].meals||{};FMEALS.forEach(m=>{if(!fHasFood(d,m))fFast[d].meals[m]=true});fClearDayMarks(d,["cheat","omc"])}else fClearAllFast(d);fSave()}
+function fSetDayFast(d,on){if(on){fFast[d]=(fFast[d]&&typeof fFast[d]==="object")?fFast[d]:{meals:{}};fFast[d].day=true;fFast[d].meals=fFast[d].meals||{};FMEALS.forEach(m=>{if(!fHasFood(d,m))fFast[d].meals[m]=true});fClearDayMarks(d,["cheat","cheatMeal","omc"])}else fClearAllFast(d);fSave()}
 function fSetMealFast(d,m,on){if(!on){const x=fNormFast(d);if(!x){if(fFast[d]!=null)delete fFast[d];fSave();return}fFast[d]=x;fFast[d].meals=fFast[d].meals||{};delete fFast[d].meals[m];fFast[d].day=false;if(!Object.keys(fFast[d].meals).length)delete fFast[d];fSave();return}
  fFast[d]=(fNormFast(d)||{meals:{}});fFast[d].meals=fFast[d].meals||{};fFast[d].meals[m]=true;if(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m]){delete fMarks[d].meals[m].cheat;delete fMarks[d].meals[m].omc}fPruneMarks(d);fSave()}
-function fSetDayCheat(d,on){if(on){fClearAllFast(d);fMarks[d]=fMarks[d]||{};fMarks[d].cheat=true;delete fMarks[d].omc;if(fMarks[d].meals)FMEALS.forEach(m=>{if(fMarks[d].meals[m])delete fMarks[d].meals[m].omc})}else if(fMarks[d])delete fMarks[d].cheat;fPruneMarks(d);fSave()}
-function fSetDayOmc(d,on){if(on){fClearAllFast(d);fMarks[d]=fMarks[d]||{};fMarks[d].omc=true;delete fMarks[d].cheat}else if(fMarks[d]){delete fMarks[d].omc;if(fMarks[d].meals)FMEALS.forEach(m=>{if(fMarks[d].meals[m])delete fMarks[d].meals[m].omc})}fPruneMarks(d);fSave()}
+function fSetDayCheat(d,on){if(on){fClearAllFast(d);fMarks[d]=fMarks[d]||{};fMarks[d].cheat=true;delete fMarks[d].omc;delete fMarks[d].cheatMeal;if(fMarks[d].meals)FMEALS.forEach(m=>{if(fMarks[d].meals[m])delete fMarks[d].meals[m].omc})}else if(fMarks[d])delete fMarks[d].cheat;fPruneMarks(d);fSave()}
+function fSetDayCheatMeal(d,on){if(on){fClearAllFast(d);fMarks[d]=fMarks[d]||{};fMarks[d].cheatMeal=true;delete fMarks[d].cheat;delete fMarks[d].omc}else if(fMarks[d])delete fMarks[d].cheatMeal;fPruneMarks(d);fSave()}
+function fSetDayOmc(d,on){if(on){fClearAllFast(d);fMarks[d]=fMarks[d]||{};fMarks[d].omc=true;delete fMarks[d].cheat;delete fMarks[d].cheatMeal}else if(fMarks[d]){delete fMarks[d].omc;if(fMarks[d].meals)FMEALS.forEach(m=>{if(fMarks[d].meals[m])delete fMarks[d].meals[m].omc})}fPruneMarks(d);fSave()}
 function fSetMealCheat(d,m,on){if(on){fClearAllFast(d);fMarks[d]=fMarks[d]||{};fMarks[d].meals=fMarks[d].meals||{};fMarks[d].meals[m]=fMarks[d].meals[m]||{};fMarks[d].meals[m].cheat=true;delete fMarks[d].meals[m].omc}else if(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m])delete fMarks[d].meals[m].cheat;fPruneMarks(d);fSave()}
-function fSetMealOmc(d,m,on){if(on){fClearAllFast(d);fMarks[d]=fMarks[d]||{};fMarks[d].meals=fMarks[d].meals||{};FMEALS.forEach(x=>{if(x!==m&&fMarks[d].meals[x])delete fMarks[d].meals[x].omc});fMarks[d].meals[m]=fMarks[d].meals[m]||{};fMarks[d].meals[m].omc=true;delete fMarks[d].meals[m].cheat;fMarks[d].omc=true;delete fMarks[d].cheat}else if(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m])delete fMarks[d].meals[m].omc;fPruneMarks(d);fSave()}
+function fSetMealOmc(d,m,on){if(on){fClearAllFast(d);fMarks[d]=fMarks[d]||{};fMarks[d].meals=fMarks[d].meals||{};FMEALS.forEach(x=>{if(x!==m&&fMarks[d].meals[x])delete fMarks[d].meals[x].omc});fMarks[d].meals[m]=fMarks[d].meals[m]||{};fMarks[d].meals[m].omc=true;delete fMarks[d].meals[m].cheat;fMarks[d].omc=true;delete fMarks[d].cheat;delete fMarks[d].cheatMeal}else if(fMarks[d]&&fMarks[d].meals&&fMarks[d].meals[m])delete fMarks[d].meals[m].omc;fPruneMarks(d);fSave()}
 function fMigrateFast(){let changed=false;
  try{const legacy=LS.get("food.fasted",null);if(legacy&&typeof legacy==="object"){Object.keys(legacy).forEach(d=>{const v=legacy[d];if(!v)return;fFast[d]=(fFast[d]&&typeof fFast[d]==="object")?fFast[d]:{meals:{}};fFast[d].meals=fFast[d].meals||{};if(v===true||v===1||v==="fast"||v==="fasted"||(v&&typeof v==="object"&&v.day))fFast[d].day=true;if(v&&v.meals&&typeof v.meals==="object")Object.keys(v.meals).forEach(m=>{if(v.meals[m])fFast[d].meals[m]=true});if(Array.isArray(v))v.forEach(m=>{if(m)fFast[d].meals[m]=true})});try{localStorage.removeItem("food.fasted")}catch(e){}changed=true}}catch(e){}
  Object.keys(fFast||{}).forEach(d=>{const x=fFast[d];if(x===true||x===1||x==="fast"||x==="fasted"){fFast[d]={day:true,meals:{}};changed=true}});
@@ -1305,7 +1307,7 @@ function renderFood(){if(!fDay)fDay=iso(new Date());const d=fDay,g=fGoals(),t=fT
  <div class="card"><div class="kcal-lg">${Math.round(t.kcal)}</div><div class="mu">kcal of ${g.kcal} goal · <b style="color:${left<0?"var(--bad)":"var(--tx)"}">${left<0?Math.abs(left)+" over":left+" left"}</b></div>
  <div style="height:8px;background:var(--card2);border-radius:4px;overflow:hidden;margin:10px 0 0"><div style="height:100%;width:${pct}%;background:${left<0?"var(--bad)":"var(--ok)"}"></div></div>
  <div class="macros"><div>Protein <b>${Math.round(t.p)}</b><span class="mu"> / ${g.p} g</span></div><div>Fat <b>${Math.round(t.f)}</b><span class="mu"> / ${g.f} g</span></div><div>Carbs <b>${Math.round(t.c)}</b><span class="mu"> / ${g.c} g</span></div><div>Fibre <b>${Math.round(t.fib)}</b><span class="mu"> / ${g.fib} g</span></div></div>
- <div class="f-marks"><button class="sm f-mark${fFastDay(d)?" on fast":""}" id="fDayFast">${fFastDay(d)?"✓ Fasting day":"Mark as fasted"}</button><button class="sm f-mark${fCheatDay(d)?" on cheat":""}" id="fDayCheat">${fCheatDay(d)?"✓ Cheat day":"Mark as cheat day"}</button><button class="sm f-mark${fOmcDay(d)?" on omc":""}" id="fDayOmc">${fOmcDay(d)?"✓ One Meal Clean":"One Meal Clean"}</button></div>${showFastInfo||streak?`<div class="mu" style="margin-top:8px">${[hrs!=null&&(fFastDay(d)||!fHasFood(d))?hrs+"h since last food":"",streak?streak+"-day fasting streak":""].filter(Boolean).join(" · ")}</div>`:""}</div>
+ <div class="f-marks"><button class="sm f-mark${fFastDay(d)?" on fast":""}" id="fDayFast">${fFastDay(d)?"✓ Fasting day":"Mark as fasted"}</button><button class="sm f-mark${fCheatDay(d)?" on cheat":""}" id="fDayCheat">${fCheatDay(d)?"✓ Cheat day":"Mark as cheat day"}</button><button class="sm f-mark${fCheatMealDay(d)?" on cheat":""}" id="fDayCheatMeal">${fCheatMealDay(d)?"✓ Cheat meal":"Mark as cheat meal"}</button><button class="sm f-mark${fOmcDay(d)?" on omc":""}" id="fDayOmc">${fOmcDay(d)?"✓ One Meal Clean":"One Meal Clean"}</button></div>${showFastInfo||streak?`<div class="mu" style="margin-top:8px">${[hrs!=null&&(fFastDay(d)||!fHasFood(d))?hrs+"h since last food":"",streak?streak+"-day fasting streak":""].filter(Boolean).join(" · ")}</div>`:""}</div>
  <div class="row"><button class="p" id="fScan">📷 Scan food</button><button class="ghost" id="fBar">▥ Barcode</button></div>`;
  FMEALS.forEach(m=>{const es=(fLog[d]||[]).map((e,i)=>({e,i})).filter(x=>x.e.meal===m),mt=fMealTot(d,m),fast=fFastMeal(d,m)&&!es.length;
   const ch=fMarkMeal(d,m,"cheat"),om=fMarkMeal(d,m,"omc");
@@ -1321,6 +1323,7 @@ function renderFood(){if(!fDay)fDay=iso(new Date());const d=fDay,g=fGoals(),t=fT
  $("#fPrev").onclick=()=>mv(-1);$("#fNext").onclick=()=>mv(1);$("#fHist").onclick=foodHistory;$("#fGoalsB").onclick=foodGoals;
  $("#fDayFast").onclick=()=>{fSetDayFast(d,!fFastDay(d));renderFood()};
  $("#fDayCheat").onclick=()=>{fSetDayCheat(d,!fCheatDay(d));renderFood()};
+ $("#fDayCheatMeal").onclick=()=>{fSetDayCheatMeal(d,!fCheatMealDay(d));renderFood()};
  $("#fDayOmc").onclick=()=>{fSetDayOmc(d,!fOmcDay(d));renderFood()};
  $("#v-food").querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{fWater[d]=Math.max(0,(fWater[d]||0)+ +b.dataset.w);fSave();renderFood()});
  $("#v-food").querySelectorAll("[data-fadd]").forEach(b=>b.onclick=()=>foodAdd(b.dataset.fadd));
