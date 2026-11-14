@@ -124,7 +124,20 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px;borde
 .awh,.shh{position:sticky;top:0;z-index:2;background:rgba(0,0,0,.95);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid #222}
 .awt{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px}.awb,.shb{padding:8px 14px;max-width:720px;margin:auto}
 input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
-.exb{margin:18px 0}.st{display:grid;grid-template-columns:30px 1fr 64px 64px 48px;gap:6px;align-items:center;padding:4px;border-radius:8px;margin-top:4px;text-align:center}
+.exb{margin:18px 0;position:relative}
+.exb.ex-ss{padding-left:12px}
+.exb.ex-ss::before,.card.ex-ss::before{content:"";position:absolute;left:0;top:4px;bottom:4px;width:4px;border-radius:4px;background:var(--ex-ss,#30d158)}
+.card.ex-ss{position:relative;padding-left:16px}
+[data-ord-handle],.exn .lnk{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;cursor:grab}
+body.ex-dragging,body.ex-dragging *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent}
+body.ex-dragging{cursor:grabbing;overscroll-behavior:none}
+.ex-reordering .exb>:not(.rowb),.ex-reordering .card>:not(.rowb),.ex-float>:not(.rowb){display:none!important}
+.ex-reordering .mv,.ex-float .mv,.ex-reordering .exn .cam,.ex-float .exn .cam{display:none!important}
+.ex-reordering .exb,.ex-float.exb{margin:6px 0;padding:12px 14px;background:var(--card,#1c1c1e);border-radius:12px}
+.ex-reordering[data-ord-root] .card,.ex-float.card{margin:6px 0;padding:12px 14px}
+.exb.ex-ph,.ex-reordering .ex-ph{visibility:hidden}
+.ex-reordering [data-ord-i]{transition:transform .18s ease}
+.ex-float{z-index:120;pointer-events:none;margin:0!important;border-radius:12px;background:var(--card,#1c1c1e);box-shadow:0 14px 36px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3);transform:scale(1.04);transform-origin:center center}.st{display:grid;grid-template-columns:30px 1fr 64px 64px 48px;gap:6px;align-items:center;padding:4px;border-radius:8px;margin-top:4px;text-align:center}
 .sb{padding:0;min-height:32px;height:32px;width:30px;flex:0 0 30px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:var(--card2);color:#fff;font-weight:700;font-size:14px}.sb.tW{color:#ff9f0a;background:rgba(255,159,10,.18)}.sb.tD{color:#bf5af2;background:rgba(191,90,242,.18)}.sb.tF{color:#ff453a;background:rgba(255,69,58,.18)}.stm button{display:flex;align-items:center;gap:12px;width:100%;margin-top:6px;text-align:left}.stm .sb{display:flex!important;justify-content:center!important;align-items:center!important;text-align:center!important;padding:0!important}.stm button.on{outline:2px solid var(--ac)}.tb{display:inline-block;min-width:16px;font-weight:700;margin-right:2px}.tb.tW{color:#ff9f0a}.tb.tD{color:#bf5af2}.tb.tF{color:#ff453a}
 .coach{background:rgba(47,140,255,.12);border:1px solid rgba(47,140,255,.4);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px;line-height:1.4}.ctip{background:var(--card2);border-radius:10px;padding:6px 10px;margin:6px 0;font-size:13px;line-height:1.4}.ctip summary{cursor:pointer;font-weight:700;color:var(--ac);padding:4px 0}.ctip .howCues{margin:4px 0 4px 18px}.cwarn{background:rgba(255,159,10,.15);border-left:3px solid #ff9f0a;color:#ffcc80;padding:5px 8px;border-radius:6px;margin:4px 0}
 .st.tm{grid-template-columns:30px 1fr 52px 68px 40px 44px}.st .sw{padding:0;min-height:40px;font-size:18px}
@@ -177,7 +190,7 @@ input.ttl{background:none;font-size:24px;font-weight:800;padding:4px 0}
 // PIN is stored only as SHA-256 hash. Privacy lock only - not real security.
 const DEFAULT_PIN_HASH="1d27ca12704e713bb23a54ae2f77a3850bb74d34afd943fd2483a57a05d725cb";
 const START=new Date(2026,9,26);const WEEKS=12;const START_WEIGHT=105.3;
-const APP_BUILD="2026.11.14.4";
+const APP_BUILD="2026.11.15.1";
 const E=(name,sets,reps,o={})=>Object.assign({name,sets,reps},o);
 const PROGRAM={
 1:{name:"Chest",group:"Chest",ex:[E("Chest Press Machine",3,"10"),E("Incline DB Press",3,"10"),E("Pec Deck/Cable Fly",3,"12"),E("Arm Rehab Band Tricep Pushdown",2,"15",{rehab:1}),E("Arm Rehab Wrist Curl (1-2kg)",2,"15",{rehab:1})]},
@@ -437,11 +450,70 @@ function exTipHTML(name,tpl,open){const b=tipBody(tipEx(name,tpl));return b?`<de
 
 // ---- Active workout (full screen) ----
 let restEnd=0,restDur=90,tick=null;
+const EX_HOLD_MS=400,EX_SLOP=12;
+let exOrd=null,exDrag=null;
+function exOrdSet(spec){exOrd=spec;if(spec&&spec.root)spec.root.setAttribute("data-ord-root","")}
+function exOrdVibrate(){try{if(navigator.vibrate)navigator.vibrate(15)}catch(e){}}
+function exOrdClearTimer(){if(exDrag&&exDrag.t){clearTimeout(exDrag.t);exDrag.t=0}}
+function exOrdOnDown(e){if(exDrag||!exOrd||!exOrd.root)return;if(e.isPrimary===false)return;if(e.pointerType==="mouse"&&e.button!==0)return;
+ const handle=e.target.closest("[data-ord-handle]");if(!handle||!exOrd.root.contains(handle))return;
+ const item=handle.closest("[data-ord-i]");if(!item)return;const i=+item.dataset.ordI;if(!(i>=0))return;
+ const list=exOrd.get&&exOrd.get();if(!list||list.length<2)return;
+ exDrag={phase:"hold",id:e.pointerId,handle,item,root:exOrd.root,i,x:e.clientX,y:e.clientY,t:setTimeout(()=>exOrdBegin(),EX_HOLD_MS)}}
+function exOrdOnMove(e){if(!exDrag||e.pointerId!==exDrag.id)return;
+ if(exDrag.phase==="hold"){if(Math.hypot(e.clientX-exDrag.x,e.clientY-exDrag.y)>EX_SLOP){exOrdClearTimer();exDrag=null}return}
+ if(exDrag.phase==="drag"){if(e.cancelable)e.preventDefault();exOrdFollow(e.clientX,e.clientY)}}
+function exOrdOnUp(e){if(!exDrag||(e.pointerId!=null&&e.pointerId!==exDrag.id))return;exOrdFinish()}
+function exOrdBegin(){if(!exDrag||exDrag.phase!=="hold")return;
+ const d=exDrag,root=d.root,item=d.item;d.phase="arm";
+ root.classList.add("ex-reordering");document.body.classList.add("ex-dragging");exOrdVibrate();
+ requestAnimationFrame(()=>{if(!exDrag||exDrag!==d)return;
+  const sc=exOrd&&exOrd.scroller||root;
+  const maxS=Math.max(0,sc.scrollHeight-sc.clientHeight);if(sc.scrollTop>maxS)sc.scrollTop=maxS;
+  const r=item.getBoundingClientRect();if(!exDrag||exDrag!==d)return;
+  d.phase="drag";d.sc=sc;d.base=sc.scrollTop;d.grab=d.y-r.top;d.left=r.left;d.to=d.i;
+  d.rows=[...root.querySelectorAll("[data-ord-i]")];
+  d.slots=d.rows.map(el=>{const b=el.getBoundingClientRect();return{top:b.top,mid:b.top+b.height/2,h:b.height}});
+  const fl=item.cloneNode(true);fl.classList.add("ex-float");fl.classList.remove("ex-ph");fl.removeAttribute("data-ord-i");
+  fl.querySelectorAll("[data-ord-handle]").forEach(n=>n.removeAttribute("data-ord-handle"));
+  fl.style.position="fixed";fl.style.left=r.left+"px";fl.style.top=r.top+"px";fl.style.width=r.width+"px";
+  if(!exDrag||exDrag!==d)return;document.body.appendChild(fl);d.float=fl;item.classList.add("ex-ph");
+  try{item.setPointerCapture(d.id)}catch(e){}
+  exOrdFollow(d.x,d.y)})}
+function exOrdFollow(x,y){if(!exDrag||exDrag.phase!=="drag")return;const d=exDrag;d.x=x;d.y=y;
+ if(d.float){d.float.style.top=(y-d.grab)+"px";d.float.style.left=d.left+"px"}
+ const box=d.sc.getBoundingClientRect(),zone=56;let spd=0;
+ if(y<box.top+zone)spd=-(Math.max(0,zone-(y-box.top)))*0.4;
+ else if(y>box.bottom-zone)spd=(Math.max(0,zone-(box.bottom-y)))*0.4;
+ d.spd=spd;if(spd&&!d.raf)d.raf=requestAnimationFrame(exOrdTick);
+ exOrdPlace(y)}
+function exOrdTick(){if(!exDrag||exDrag.phase!=="drag"){if(exDrag)exDrag.raf=0;return}
+ const d=exDrag;if(d.spd){d.sc.scrollTop+=d.spd;d.raf=requestAnimationFrame(exOrdTick)}else d.raf=0;exOrdPlace(d.y)}
+function exOrdPlace(y){const d=exDrag;if(!d||!d.slots)return;const delta=d.sc.scrollTop-d.base;let to=0,best=1e9;
+ d.slots.forEach((s,i)=>{const dist=Math.abs(y-(s.mid-delta));if(dist<best){best=dist;to=i}});
+ if(to===d.to)return;d.to=to;const h=d.slots[d.i].h;
+ d.rows.forEach((el,idx)=>{if(idx===d.i){el.style.transform="";return}let sh=0;
+  if(d.i<to&&idx>d.i&&idx<=to)sh=-h;else if(d.i>to&&idx>=to&&idx<d.i)sh=h;
+  el.style.transform=sh?"translateY("+sh+"px)":""})}
+function exOrdFinish(){if(!exDrag)return;const d=exDrag;exDrag=null;exOrdClearTimer();if(d.t)clearTimeout(d.t);if(d.raf)cancelAnimationFrame(d.raf);
+ if(d.float&&d.float.parentNode)d.float.parentNode.removeChild(d.float);
+ if(d.item){d.item.classList.remove("ex-ph");try{d.item.releasePointerCapture(d.id)}catch(e){}}
+ if(d.root)d.root.classList.remove("ex-reordering");document.body.classList.remove("ex-dragging");
+ (d.rows||[]).forEach(el=>el.style.transform="");
+ if(d.phase==="drag"||d.phase==="arm"){const eat=ev=>{ev.preventDefault();ev.stopPropagation()};
+  if(d.handle){d.handle.addEventListener("click",eat,{capture:true,once:true});setTimeout(()=>d.handle.removeEventListener("click",eat,true),500)}
+  if(d.phase==="drag"&&exOrd&&typeof exOrd.get==="function"){const list=exOrd.get();
+   if(list&&d.to!=null&&d.to!==d.i&&d.to>=0&&d.to<list.length){const[x]=list.splice(d.i,1);list.splice(d.to,0,x)}
+   if(typeof exOrd.commit==="function")exOrd.commit()}}}
+function initExReorder(){if(initExReorder.ok)return;initExReorder.ok=true;
+ document.addEventListener("pointerdown",exOrdOnDown);document.addEventListener("pointermove",exOrdOnMove,{passive:false});
+ document.addEventListener("pointerup",exOrdOnUp);document.addEventListener("pointercancel",exOrdOnUp);
+ document.addEventListener("touchmove",e=>{if(exDrag&&exDrag.phase==="drag"&&e.cancelable)e.preventDefault()},{passive:false,capture:true})}
 function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList.remove("hid");updResume();
  let h=`<div class="awh"><button class="sm" id="awMin" aria-label="Minimise">⌄</button><div class="awt" id="awT"></div><button class="ok" id="awFin">${a.id?"Save":"Finish"}</button></div><div class="awb">
  <input class="ttl" id="awName" value="${esc(a.name)}" aria-label="Workout name"><input type="date" id="awDate" value="${a.date}" style="margin-top:4px">${a.note?`<div class="mu" style="margin-top:6px">ℹ️ ${esc(a.note)}</div>`:""}${coachBox(a.tplName||a.name)}`;
  a.ex.forEach((e,i)=>{const x=exById(e.exId)||{name:e.name||e.exId};const prev=prevSets(e.exId,a.id),tm=isTimed(e.exId),bw=isBW(e.exId);
-  h+=`<div class="exb ${x.rehab?"rehab":""}" style="${x.rehab?"padding-left:8px":""}"><div class="rowb"><div class="exn"><button class="lnk" data-xd="${esc(e.exId)}">${esc(x.name)} ⓘ</button><button class="cam" data-cam="${esc(e.exId)}" aria-label="Machine photos"><i class="ce">📷</i><span class="cb hid"></span></button></div><div class="mv"><button class="sm" data-up="${i}" aria-label="Move up">▲</button><button class="sm" data-dn="${i}" aria-label="Move down">▼</button><button class="d" data-rx="${i}" aria-label="Remove">✕</button></div></div>${e.target?`<div class="mu">Target ${e.sets.length} × ${esc(e.target)}${x.rehab?" · rehab, keep light":""}</div>`:""}${x.best?`<div class="mu">🏆 Previous best: ${bestTxt(x.best)}</div>`:""}${exTipHTML(x.name,a.tplName||a.name)}
+  h+=`<div class="exb ${x.rehab?"rehab":""}${e.ss!=null&&e.ss!==""?" ex-ss":""}" data-ord-i="${i}" style="${x.rehab?"padding-left:8px":""}${e.ssColor?`--ex-ss:${e.ssColor};`:""}"><div class="rowb"><div class="exn" data-ord-handle><button class="lnk" data-xd="${esc(e.exId)}">${esc(x.name)} ⓘ</button><button class="cam" data-cam="${esc(e.exId)}" aria-label="Machine photos"><i class="ce">📷</i><span class="cb hid"></span></button></div><div class="mv"><button class="sm" data-up="${i}" aria-label="Move up">▲</button><button class="sm" data-dn="${i}" aria-label="Move down">▼</button><button class="d" data-rx="${i}" aria-label="Remove">✕</button></div></div>${e.target?`<div class="mu">Target ${e.sets.length} × ${esc(e.target)}${x.rehab?" · rehab, keep light":""}</div>`:""}${x.best?`<div class="mu">🏆 Previous best: ${bestTxt(x.best)}</div>`:""}${exTipHTML(x.name,a.tplName||a.name)}
   ${tm?`<div class="st hd tm"><span>SET</span><span>PREVIOUS</span><span>${isCardio(e.exId)?"KM":"KG"}</span><span>TIME</span><span>⏱</span><span>✓</span></div>`:`<div class="st hd"><span>SET</span><span>PREVIOUS</span><span>${bw?(isReps(e.exId)?"":"+KG"):isAsst(e.exId)?"−KG":"KG"}</span><span>REPS</span><span>✓</span></div>`}`;
   e.sets.forEach((s,j)=>{const p=prev[j];h+=`<div class="st ${tm?"tm ":""}${s.done?"dn":""}" data-i="${i}" data-j="${j}"><button class="sb t${tCode(s.type)}" data-sb aria-label="Set type">${tCode(s.type)==="N"?j+1:tCode(s.type)}</button><span class="mu">${p&&(p.w!=null||p.r!=null)?(bw?(p.w!==""&&p.w!=null&&+p.w?"BW+"+p.w:"BW"):(isAsst(e.exId)?"−":"")+(p.w??"–"))+" × "+rOut(e.exId,p.r):"–"}</span><input type="number" inputmode="decimal" step="0.5" min="0" class="iw${bw?" bwk":""}" value="${s.w??""}" placeholder="${bw?(p&&p.w!=null&&p.w!==""&&+p.w?p.w:"+kg"):p&&p.w!=null?p.w:""}" ${bw?(isReps(e.exId)?'disabled style="visibility:hidden" aria-hidden="true"':'aria-label="Added weight (optional)"'):isAsst(e.exId)?'aria-label="Assistance kg"':""}>${tm?`<input type="text" inputmode="decimal" class="ir it" value="${esc(fmtS(s.r))}" placeholder="${p&&p.r!=null?fmtS(p.r):"m:ss"}" aria-label="Time (m:ss)" autocomplete="off"><button class="sw ghost" data-sw aria-label="Stopwatch">⏱</button>`:`<input type="number" inputmode="numeric" min="0" class="ir" value="${s.r??""}" placeholder="${p&&p.r!=null?p.r:""}">`}<button class="ck" aria-label="Done">✓</button></div><div class="rl ${restOf(e,s)?"":"off"}" data-ri="${i}" data-rj="${j}"><span class="rf"></span><button class="rt" data-rt="${i},${j}">${restOf(e,s)?fmtT(restOf(e,s)*1000):"Off"}</button></div>`});
   h+=`<div class="row" style="margin-top:6px"><button class="ghost" data-as="${i}">+ Add Set (${exRest(e)?fmtT(exRest(e)*1000):"Off"})</button>${e.sets.length?`<button class="ghost" data-rs="${i}">− Set</button>`:""}</div><textarea class="exnote" data-xn="${i}" rows="2" placeholder="📝 Notes for this exercise (seat, feel, pain…)" aria-label="Exercise notes" style="margin-top:6px;min-height:52px;font-size:16px">${esc(e.note||"")}</textarea></div>`});
@@ -450,6 +522,7 @@ function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList
  <label>Rest timer (seconds)<input type="number" inputmode="numeric" id="restD" value="${restDur}"></label></div>
  <button class="w d" id="awCancel">${a.id?"Cancel edit":"Cancel workout"}</button></div><div id="rest" class="rest hid"></div>`;
  m.innerHTML=h;
+ exOrdSet({root:m,scroller:m,get:()=>active&&active.ex,commit:()=>{saveActive();renderActive()}});
  $("#awMin").onclick=()=>{m.classList.add("hid");show(view)};
  $("#awFin").onclick=finishWorkout;
  $("#awCancel").onclick=()=>{if(confirm(a.id?"Discard changes?":"Cancel this workout? Nothing will be saved.")){active=null;saveActive();restEnd=0;m.classList.add("hid");show(view)}};
@@ -594,6 +667,7 @@ function phoneHelp(){openSheet("Phone timer setup",`<div class="card"><b>One-tim
 <button class="w" id="phTest">▶ Test: 10 s timer</button>`).querySelector("#phTest").onclick=()=>phoneTimer(10)}
 function vibNote(){if(!navigator.vibrate&&!LS.get("gym.vibNote",false)){LS.set("gym.vibNote",true);alert("Note: Safari on iPhone can't vibrate, so Buzz plays a loud buzz sound instead. Keep your volume up.")}}
 function restDone(){restAt=null;restOverTs=Date.now();if(navigator.vibrate)navigator.vibrate([350,150,350,150,350]);if(document.hidden)pendSound=true;else{if(!playCue("restEnd"))beep()}const ago=restEnd?Math.round((Date.now()-restEnd)/1000):0;toast(ago>2?"Rest over "+(ago<60?ago+"s":Math.round(ago/60)+" min")+" ago 💪":"Rest over 💪")}
+initExReorder();
 document.addEventListener("pointerdown",unlockAudio,{capture:true,passive:true});document.addEventListener("touchend",unlockAudio,{capture:true,passive:true});
 document.addEventListener("visibilitychange",()=>{if(document.hidden)return;unlockAudio();tickFn();/* end time is a timestamp, so this fires at once on return */
  if(pendSound){pendSound=false;if(!(Date.now()-restOverTs<120000&&playCue("restEnd")))beep()}});
@@ -851,7 +925,7 @@ async function camBadges(){let ps=[];try{ps=await allPhotos()}catch(e){return}
 function editTpl(id){const orig=id?tpl.find(t=>t.id===id):null;const t=orig?JSON.parse(JSON.stringify(orig)):{id:"t"+uid(),name:"New template",dow:"",group:"Other",note:"",items:[]};
  const s=openSheet(orig?"Edit template":"New template","",'<button class="ok" id="tS">Save</button>');const b=s.querySelector(".shb");
  const draw=()=>{b.innerHTML=`<label>Name<input id="tN" value="${esc(t.name)}"></label><div class="row"><label>Day<select id="tD"><option value="">Any day</option>${[1,2,3,4,5,6,0].map(d=>`<option value="${d}" ${t.dow!==""&&t.dow==d?"selected":""}>${DAYS[d]}</option>`).join("")}</select></label><label>Group<select id="tG">${[...new Set([...GROUPS,t.group])].map(g=>`<option ${g===t.group?"selected":""}>${esc(g)}</option>`).join("")}</select></label></div>
-  <div class="lbl">EXERCISES</div>${t.items.map((i,k)=>`<div class="card"><div class="rowb"><b>${esc(exName(i.exId))}</b></div><div class="row" style="margin-top:6px"><input type="number" inputmode="numeric" data-se="${k}" value="${i.sets}" aria-label="Sets" style="max-width:70px"><span class="mu" style="flex:0">×</span><input data-re="${k}" value="${esc(i.reps)}" aria-label="Reps" style="max-width:110px"><div class="mv" style="flex:0 0 auto"><button class="sm" data-u="${k}" aria-label="Move up">▲</button><button class="sm" data-d="${k}" aria-label="Move down">▼</button><button class="d" data-r="${k}" aria-label="Remove">✕</button></div></div></div>`).join("")||'<div class="mu">No exercises yet.</div>'}
+  <div class="lbl">EXERCISES</div>${t.items.map((i,k)=>`<div class="card${i.ss!=null&&i.ss!==""?" ex-ss":""}" data-ord-i="${k}" style="${i.ssColor?`--ex-ss:${i.ssColor}`:""}"><div class="rowb"><b data-ord-handle>${esc(exName(i.exId))}</b></div><div class="row" style="margin-top:6px"><input type="number" inputmode="numeric" data-se="${k}" value="${i.sets}" aria-label="Sets" style="max-width:70px"><span class="mu" style="flex:0">×</span><input data-re="${k}" value="${esc(i.reps)}" aria-label="Reps" style="max-width:110px"><div class="mv" style="flex:0 0 auto"><button class="sm" data-u="${k}" aria-label="Move up">▲</button><button class="sm" data-d="${k}" aria-label="Move down">▼</button><button class="d" data-r="${k}" aria-label="Remove">✕</button></div></div></div>`).join("")||'<div class="mu">No exercises yet.</div>'}
   <button class="ghost w" id="tA">+ Add exercise</button>${orig?'<button class="d w" id="tX">🗑 Delete template</button>':""}`;
   b.querySelector("#tN").oninput=e=>t.name=e.target.value;b.querySelector("#tD").onchange=e=>t.dow=e.target.value===""?"":+e.target.value;b.querySelector("#tG").onchange=e=>t.group=e.target.value;
   b.querySelectorAll("[data-se]").forEach(x=>x.oninput=()=>t.items[+x.dataset.se].sets=Math.max(1,+x.value||1));
@@ -860,7 +934,7 @@ function editTpl(id){const orig=id?tpl.find(t=>t.id===id):null;const t=orig?JSON
   b.querySelectorAll("[data-d]").forEach(x=>x.onclick=()=>{const k=+x.dataset.d;if(k<t.items.length-1){[t.items[k+1],t.items[k]]=[t.items[k],t.items[k+1]];draw()}});
   b.querySelectorAll("[data-r]").forEach(x=>x.onclick=()=>{if(confirm("Remove "+exName(t.items[+x.dataset.r].exId)+" from this template?")){t.items.splice(+x.dataset.r,1);draw()}});
   b.querySelector("#tA").onclick=()=>pickExercise(eid=>{t.items.push({exId:eid,sets:3,reps:"10"});draw()});
-  if(orig)b.querySelector("#tX").onclick=()=>{if(confirm("Delete template "+t.name+"?")){tpl=tpl.filter(x=>x.id!==t.id);saveLib();s.remove();show(view)}}};
+  if(orig)b.querySelector("#tX").onclick=()=>{if(confirm("Delete template "+t.name+"?")){tpl=tpl.filter(x=>x.id!==t.id);saveLib();s.remove();show(view)}};exOrdSet({root:s,scroller:s,get:()=>t.items,commit:()=>draw()});};
  s.querySelector("#tS").onclick=()=>{if(!t.name.trim())return alert("Enter a name");if(orig)tpl=tpl.map(x=>x.id===t.id?t:x);else tpl.push(t);saveLib();s.remove();toast("Template saved ✓");show(view)};
  draw()}
 
