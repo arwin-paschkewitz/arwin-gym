@@ -170,6 +170,11 @@ body.ex-dragging{cursor:grabbing;overscroll-behavior:none}
 .rvp{position:absolute;right:10px;bottom:10px;width:52px;height:52px;border-radius:50%;background:var(--ac);color:#fff;font-size:20px;padding:0;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 .seg{display:flex;background:var(--card2);border-radius:10px;padding:3px;margin-top:6px;gap:2px}.seg button{flex:1;min-height:38px;background:none;color:var(--mu);font-size:14px;padding:4px 2px;border-radius:8px}.seg button.on{background:var(--ac);color:#fff}
 .h3{font-size:19px;font-weight:800;margin:18px 0 6px}.steps{margin:0;padding-left:22px}.steps li{margin:6px 0;line-height:1.45}.rec{padding:10px 0;border-bottom:1px solid #2a2a2c}.rec:last-child{border:0}
+.tsub{margin-top:14px;padding-top:12px;border-top:1px solid rgba(128,128,128,.25)}.tsub:first-child{margin-top:8px;padding-top:0;border-top:0}
+.tclip{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding:10px;background:var(--card2);border-radius:10px}
+.tclipn{font-size:15px;word-break:break-word;line-height:1.3}.tclipr{display:flex;gap:8px}.tclipr button{flex:1;min-height:44px;margin-top:0}
+label.cup{display:block;width:100%;margin-top:10px;background:var(--card2);color:var(--tx);border-radius:10px;min-height:44px;padding:10px 12px;text-align:center;font-weight:600;font-size:16px;position:relative;cursor:pointer;box-sizing:border-box}
+label.cup input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)}
 </style></head><body>
 <div id="updBar" class="hid">A new version of Gym Log is ready. <button type="button" id="updGo">Reload</button></div>
 <div id="lock"><h1>🔒 Gym Log</h1><div class="mu">Enter PIN</div><div id="pinDots"></div><div class="pad" id="pad"></div><div id="pinErr" class="mu"></div></div>
@@ -190,7 +195,7 @@ body.ex-dragging{cursor:grabbing;overscroll-behavior:none}
 // PIN is stored only as SHA-256 hash. Privacy lock only - not real security.
 const DEFAULT_PIN_HASH="1d27ca12704e713bb23a54ae2f77a3850bb74d34afd943fd2483a57a05d725cb";
 const START=new Date(2026,9,26);const WEEKS=12;const START_WEIGHT=105.3;
-const APP_BUILD="2026.11.15.1";
+const APP_BUILD="2026.11.17.1";
 const E=(name,sets,reps,o={})=>Object.assign({name,sets,reps},o);
 const PROGRAM={
 1:{name:"Chest",group:"Chest",ex:[E("Chest Press Machine",3,"10"),E("Incline DB Press",3,"10"),E("Pec Deck/Cable Fly",3,"12"),E("Arm Rehab Band Tricep Pushdown",2,"15",{rehab:1}),E("Arm Rehab Wrist Curl (1-2kg)",2,"15",{rehab:1})]},
@@ -608,50 +613,82 @@ function playWA(kind){unlockAudio();if(!actx)return;const go=()=>{try{const t0=a
  let ran=false;const run=()=>{if(ran||actx.state!=="running")return;ran=true;go()};
  try{actx.resume().then(run,()=>{})}catch(e){}setTimeout(()=>{if(!ran){pendSound=true;pendKind=kind}},400)}
 
-/* ---- Custom audio cues: clips in IndexedDB, played via Web Audio at 1.5x gain + limiter (same path as buzzer); <audio> fallback; default sound if anything fails ---- */
-const CUES=[["ready10","10 seconds left on rest","Spoken phrase"],["restEnd","Rest timer finished","Buzzer / beep"],["cd321","3-2-1 countdown (stopwatch)","None"],["wStart","Workout started","None"],["wFinish","Workout finished","None"]];
-let cueMode=LS.get("gym.cueMode",{}),cueBuf={},cueUrl={},_cdb;
-function cueDB(){return _cdb||(_cdb=new Promise((ok,no)=>{const r=indexedDB.open("gymCues",1);r.onupgradeneeded=()=>r.result.createObjectStore("clips",{keyPath:"id"});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}))}
-async function cueGet(id){const d=await cueDB();return new Promise((ok,no)=>{const q=d.transaction("clips").objectStore("clips").get(id);q.onsuccess=()=>ok(q.result||null);q.onerror=()=>no(q.error)})}
-async function cuePut(id,blob,name){const d=await cueDB();return new Promise((ok,no)=>{const t=d.transaction("clips","readwrite");t.objectStore("clips").put({id,blob,type:blob.type,name:name||"",ts:Date.now()});t.oncomplete=()=>ok();t.onerror=()=>no(t.error)})}
-async function cueDel(id){const d=await cueDB();return new Promise(ok=>{const t=d.transaction("clips","readwrite");t.objectStore("clips").delete(id);t.oncomplete=()=>ok();t.onerror=()=>ok()})}
+/* ---- Custom audio cues: multiple clips per cue in IndexedDB, random play (no immediate repeat); Web Audio at 1.5x gain + limiter; <audio> fallback; default sound if none ---- */
+const CUES=[["ready10","10 seconds left","Spoken phrase"],["restEnd","Timer end","Buzzer / beep"],["cd321","3-2-1 countdown (stopwatch)","None"],["wStart","Workout started","None"],["wFinish","Workout finished","None"]];
+const TIMER_CUES=["ready10","restEnd"];
+let cueMode=LS.get("gym.cueMode",{}),cueSounds={},cueLast={},_cdb;
+function cueDB(){return _cdb||(_cdb=new Promise((ok,no)=>{const r=indexedDB.open("gymCues",2);
+ r.onupgradeneeded=e=>{const d=r.result;if(!d.objectStoreNames.contains("clips"))d.createObjectStore("clips",{keyPath:"id"});
+  if(!d.objectStoreNames.contains("sounds")){const s=d.createObjectStore("sounds",{keyPath:"id"});s.createIndex("cue","cue",{unique:false})}};
+ r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}).then(async d=>{await cueMigrate(d);return d}))}
+async function cueMigrate(d){if(LS.get("gym.cueMigrated2",false))return;
+ try{if(!d.objectStoreNames.contains("clips")||!d.objectStoreNames.contains("sounds")){LS.set("gym.cueMigrated2",true);return}
+  const old=await new Promise(ok=>{const q=d.transaction("clips").objectStore("clips").getAll();q.onsuccess=()=>ok(q.result||[]);q.onerror=()=>ok([])});
+  for(const rec of old){if(!rec||!rec.blob||!CUES.some(([id])=>id===rec.id))continue;
+   await new Promise(ok=>{const t=d.transaction("sounds","readwrite");t.objectStore("sounds").put({id:rec.id+"-migrated",cue:rec.id,blob:rec.blob,type:rec.type||rec.blob.type||"",name:rec.name||"Custom clip",ts:rec.ts||Date.now()});t.oncomplete=()=>ok();t.onerror=()=>ok()})}
+  LS.set("gym.cueMigrated2",true)}catch(e){try{LS.set("gym.cueMigrated2",true)}catch(_){}}}
+function cueNewId(){return "s-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8)}
+async function cuePutSound(rec){const d=await cueDB();return new Promise((ok,no)=>{const t=d.transaction("sounds","readwrite");t.objectStore("sounds").put(rec);t.oncomplete=()=>ok();t.onerror=()=>no(t.error)})}
+async function cueDelSound(id){const d=await cueDB();return new Promise(ok=>{const t=d.transaction("sounds","readwrite");t.objectStore("sounds").delete(id);t.oncomplete=()=>ok();t.onerror=()=>ok()})}
+async function cueAll(cue){const d=await cueDB();return new Promise(ok=>{const q=d.transaction("sounds").objectStore("sounds").index("cue").getAll(cue);q.onsuccess=()=>ok((q.result||[]).sort((a,b)=>(a.ts||0)-(b.ts||0)));q.onerror=()=>ok([])})}
 function decodeBuf(ab){return new Promise((ok,no)=>{try{const c=actx||newCtx(),p=c.decodeAudioData(ab,ok,no);if(p&&p.then)p.then(ok,no)}catch(e){no(e)}})}
-async function cueLoad(id){try{delete cueBuf[id];if(cueUrl[id]){URL.revokeObjectURL(cueUrl[id]);delete cueUrl[id]}const r=await cueGet(id);if(!r||!r.blob)return false;cueUrl[id]=URL.createObjectURL(r.blob);
-  try{if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();cueBuf[id]=await decodeBuf(await r.blob.arrayBuffer())}catch(e){}return true}catch(e){return false}}
-function cueOn(id){return (cueMode[id]==="rec"||cueMode[id]==="up")&&(cueBuf[id]||cueUrl[id])}
-/* plays the custom clip if set; returns false so the caller plays its default */
-function playCue(id){if(!cueOn(id)||restSound==="off")return false;const b=cueBuf[id],dur=b?b.duration*1000:3000;
+function cueForget(id){for(const k of Object.keys(cueSounds)){const s=(cueSounds[k]||[]).find(x=>x.id===id);if(s&&s.url){try{URL.revokeObjectURL(s.url)}catch(e){}}cueSounds[k]=(cueSounds[k]||[]).filter(x=>x.id!==id)}}
+async function cueLoadRec(rec){if(!rec||!rec.blob||!rec.cue)return null;const slot={id:rec.id,cue:rec.cue,name:rec.name||"Clip",type:rec.type||rec.blob.type||"",ts:rec.ts||0,buf:null,url:URL.createObjectURL(rec.blob)};
+ try{if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();slot.buf=await decodeBuf(await rec.blob.arrayBuffer())}catch(e){}
+ const list=(cueSounds[rec.cue]||[]).filter(x=>x.id!==rec.id);list.push(slot);list.sort((a,b)=>(a.ts||0)-(b.ts||0));cueSounds[rec.cue]=list;return slot}
+async function cueLoadCue(cue){(cueSounds[cue]||[]).forEach(s=>{if(s.url)try{URL.revokeObjectURL(s.url)}catch(e){}});cueSounds[cue]=[];
+ const rows=await cueAll(cue);for(const rec of rows)await cueLoadRec(rec);return cueSounds[cue]}
+function cueOn(id){return (cueSounds[id]||[]).some(s=>s.buf||s.url)}
+function cuePick(id,list){list=list||(cueSounds[id]||[]).filter(s=>s.buf||s.url);if(!list.length)return null;
+ let pool=list;if(list.length>1&&cueLast[id]){const f=list.filter(s=>s.id!==cueLast[id]);if(f.length)pool=f}
+ const pick=pool[Math.floor(Math.random()*pool.length)];cueLast[id]=pick.id;return pick}
+/* plays a random custom clip if any are loaded; returns false so the caller plays its default. Pass fixed to preview one clip. */
+function playCue(id,fixed){if(restSound==="off")return false;const pick=fixed||cuePick(id);if(!pick)return false;
+ const b=pick.buf,dur=b?b.duration*1000:3000;
  if(audMode==="loud")setSession();else duckFor(dur+400);
- const viaEl=()=>{try{const a=new Audio(cueUrl[id]);a.setAttribute("playsinline","");a.volume=1;const p=a.play();if(p&&p.catch)p.catch(()=>{const d={ready10:()=>{cueMode._skip=1;sayReady();delete cueMode._skip},restEnd:()=>playTones(restSound==="beep"?"beep":"buzz")}[id];d&&d()})}catch(e){}};
- if(!b||!cueUrl[id]&&!b)return viaEl(),true;
+ const viaEl=()=>{try{if(!pick.url)throw 0;const a=new Audio(pick.url);a.setAttribute("playsinline","");a.volume=1;const p=a.play();if(p&&p.catch)p.catch(()=>{if(fixed)return;const d={ready10:()=>{cueMode._skip=1;sayReady();delete cueMode._skip},restEnd:()=>playTones(restSound==="beep"?"beep":"buzz")}[id];d&&d()})}catch(e){if(!fixed){const d={ready10:()=>{cueMode._skip=1;sayReady();delete cueMode._skip},restEnd:()=>playTones(restSound==="beep"?"beep":"buzz")}[id];d&&d()}}};
+ if(!b)return viaEl(),true;
  (async()=>{try{if(!actx||actx.state==="closed"||actx.state==="interrupted")newCtx();if(actx.state!=="running")await Promise.race([actx.resume(),new Promise(r=>setTimeout(r,350))]);
   if(actx.state!=="running")return viaEl();
   const t0=actx.currentTime+.03,src=actx.createBufferSource(),g=actx.createGain(),m=actx.createDynamicsCompressor?actx.createDynamicsCompressor():null;src.buffer=b;g.gain.value=1.5;
   if(m){m.threshold.value=-2;m.knee.value=0;m.ratio.value=20;m.attack.value=.001;m.release.value=.08;src.connect(g).connect(m).connect(actx.destination)}else src.connect(g).connect(actx.destination);
   src.onended=()=>{if(audMode==="duck")duckFor(300)};src.start(t0)}catch(e){viaEl()}})();return true}
-function cueInit(){CUES.forEach(([id])=>{if(cueMode[id]==="rec"||cueMode[id]==="up")cueLoad(id)})}
+async function cueInit(){try{await Promise.all(CUES.map(([id])=>cueLoadCue(id)));const box=document.querySelector("#cueBox");if(box){box.innerHTML=cueRowsHTML();bindCues(document)}}catch(e){}}
 setTimeout(cueInit,0);
 function recMime(){const t=["audio/mp4","audio/mp4;codecs=mp4a.40.2","audio/aac","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return "";return t.find(x=>MediaRecorder.isTypeSupported(x))||""}
-function cueRowsHTML(){return CUES.map(([id,lab,def])=>{const m=cueMode[id]||"def";return `<div class="cuer" data-cue="${id}" style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(128,128,128,.25)"><b>${lab}</b><div class="seg" style="margin-top:6px">${[["def","Default"],["rec","Record"],["up","Upload"]].map(([k,n])=>`<button data-cm="${k}" class="${m===k?"on":""}">${n}</button>`).join("")}</div>
- <div class="mu cst" style="margin:4px 0">${m==="def"?"Default: "+def:(cueUrl[id]?"Custom clip saved ✓":"No clip yet — default plays")}</div>
- <div class="cpanel" ${m==="def"?'style="display:none"':""}>${m==="rec"?`<button class="w crec">🎙 ${cueUrl[id]?"Re-record":"Record"}</button>`:`<input type="file" accept="audio/*" class="cfile" style="margin-top:4px;font-size:16px">`}<button class="w cplay" ${cueUrl[id]?"":"disabled"}>▶ Preview</button><button class="w cdel" ${cueUrl[id]?"":"disabled"}>🗑 Remove clip</button></div></div>`}).join("")}
+const CUE_ACCEPT="audio/*,.m4a,.mp3,.wav,.aac,.caf,.ogg,.webm,.mpeg,.mp4";
+function clipRowHTML(s){return `<div class="tclip" data-sid="${esc(s.id)}"><div class="tclipn">${esc(s.name||"Clip")}</div><div class="tclipr"><button type="button" class="cplay">▶ Play</button><button type="button" class="cdel d">🗑 Delete</button></div></div>`}
+function cueBlockHTML(id,lab,def){const list=cueSounds[id]||[];
+ return `<div class="tsub" data-cue="${id}"><b>${lab}</b><div class="mu" style="margin:4px 0">${list.length?list.length+" clip"+(list.length>1?"s":"")+" — one plays at random":"No clips yet — default: "+def}</div>
+ <div class="clist">${list.map(clipRowHTML).join("")}</div>
+ <label class="cup">📁 Upload clips<input type="file" accept="${CUE_ACCEPT}" multiple class="cfile"></label>
+ <button type="button" class="w crec">🎙 Record a clip</button></div>`}
+function cueRowsHTML(){const main=CUES.filter(([id])=>TIMER_CUES.includes(id)),other=CUES.filter(([id])=>!TIMER_CUES.includes(id));
+ return main.map(([id,lab,def])=>cueBlockHTML(id,lab,def)).join("")+
+  `<details class="tsub" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">Other cues</summary><div class="mu" style="margin:6px 0">Optional sounds for the stopwatch countdown and starting or finishing a workout.</div>${other.map(([id,lab,def])=>cueBlockHTML(id,lab,def)).join("")}</details>`}
 let cueRec=null;
 function bindCues(root){const box=root.querySelector("#cueBox");if(!box)return;const redraw=()=>{box.innerHTML=cueRowsHTML();bindCues(root)};
- box.querySelectorAll(".cuer").forEach(r=>{const id=r.dataset.cue,st=r.querySelector(".cst");
-  r.querySelectorAll("[data-cm]").forEach(b=>b.onclick=()=>{if(cueRec)return;cueMode[id]=b.dataset.cm;if(cueMode[id]==="def")delete cueMode[id];LS.set("gym.cueMode",cueMode);redraw()});
-  const pl=r.querySelector(".cplay");if(pl)pl.onclick=()=>{unlockAudio();const o=restSound;if(o==="off")restSound="buzz";if(!playCue(id))toast("No clip to play");restSound=o};
-  const dl=r.querySelector(".cdel");if(dl)dl.onclick=async()=>{if(!confirm("Remove this clip?"))return;await cueDel(id);delete cueBuf[id];if(cueUrl[id])URL.revokeObjectURL(cueUrl[id]);delete cueUrl[id];redraw()};
-  const fi=r.querySelector(".cfile");if(fi)fi.onchange=async()=>{const f=fi.files&&fi.files[0];if(!f)return;if(f.size>5e6&&!confirm("That file is over 5 MB. Short clips work best. Use it anyway?"))return;
-   await cuePut(id,f,f.name);const ok=await cueLoad(id);if(!cueBuf[id])toast("Saved, but this format may not play on this phone");else toast("Clip saved ✓");redraw()};
-  const rb=r.querySelector(".crec");if(rb)rb.onclick=async()=>{
+ box.querySelectorAll("[data-cue]").forEach(r=>{const id=r.dataset.cue;
+  r.querySelectorAll(".tclip").forEach(row=>{const sid=row.dataset.sid,slot=(cueSounds[id]||[]).find(s=>s.id===sid);
+   const pl=row.querySelector(".cplay");if(pl)pl.onclick=()=>{unlockAudio();if(!slot)return toast("No clip to play");const o=restSound;if(o==="off")restSound="buzz";if(!playCue(id,slot))toast("Couldn't play this clip");restSound=o};
+   const dl=row.querySelector(".cdel");if(dl)dl.onclick=async()=>{if(!confirm("Delete this clip?"))return;await cueDelSound(sid);cueForget(sid);toast("Clip deleted");redraw()}});
+  const fi=r.querySelector(".cfile");
+  if(fi)fi.onchange=async()=>{const files=[...fi.files||[]];fi.value="";if(!files.length)return;let n=0;
+   for(const f of files){if(f.size>5e6&&!confirm((f.name||"That file")+" is over 5 MB. Short clips work best. Use it anyway?"))continue;
+    const rec={id:cueNewId(),cue:id,blob:f,type:f.type||"",name:f.name||"Clip",ts:Date.now()};await cuePutSound(rec);const slot=await cueLoadRec(rec);n++;if(!slot||!slot.buf)toast((f.name||"Clip")+" saved, but this format may not play on this phone")}
+   if(n)toast(n>1?n+" clips saved ✓":"Clip saved ✓");redraw()};
+  const rb=r.querySelector(".crec"),st=r.querySelector(".mu");
+  if(rb)rb.onclick=async()=>{
    if(cueRec){cueRec.stop();return}
    if(!navigator.mediaDevices||!window.MediaRecorder){alert("Recording isn't supported in this browser. Use Upload instead (record a voice memo, then pick the file).");return}
    let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){alert("Microphone blocked. iPhone: Settings → Safari → Microphone → Allow (or tap Allow when asked).");return}
    const mt=recMime(),chunks=[];let mr;try{mr=mt?new MediaRecorder(stream,{mimeType:mt}):new MediaRecorder(stream)}catch(e){mr=new MediaRecorder(stream)}
    cueRec=mr;let to;mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
    mr.onstop=async()=>{clearTimeout(to);stream.getTracks().forEach(t=>t.stop());cueRec=null;setSession();if(!chunks.length){toast("Nothing recorded");return redraw()}
-    const blob=new Blob(chunks,{type:mr.mimeType||mt||"audio/mp4"});await cuePut(id,blob,"recording");await cueLoad(id);toast("Recording saved ✓");redraw()};
-   mr.start();rb.textContent="⏹ Stop (max 10 s)";rb.className="w d crec";st.textContent="Recording…";to=setTimeout(()=>{if(mr.state==="recording")mr.stop()},10000)}})}
+    const blob=new Blob(chunks,{type:mr.mimeType||mt||"audio/mp4"}),n=new Date(),pad=x=>String(x).padStart(2,"0"),
+     name="Recording "+n.getDate()+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][n.getMonth()]+" "+pad(n.getHours())+":"+pad(n.getMinutes());
+    const rec={id:cueNewId(),cue:id,blob,type:blob.type,name,ts:Date.now()};await cuePutSound(rec);await cueLoadRec(rec);toast("Recording saved ✓");redraw()};
+   mr.start();rb.textContent="⏹ Stop (max 10 s)";rb.className="w d crec";if(st)st.textContent="Recording…";to=setTimeout(()=>{if(mr.state==="recording")mr.stop()},10000)}})}
 function beep(){if(restSound==="off")return;playTones(restSound==="beep"?"beep":"buzz")}
 /* Phone timer alert: runs the user's "Gym Rest" iOS Shortcut, which starts a Clock timer (rings in background / on lock screen) */
 let phoneT=LS.get("gym.phoneT",false);
@@ -960,7 +997,7 @@ function renderProfile(){charts.forEach(c=>c.destroy());charts=[];
  <div class="card"><b>Average pain</b><div style="height:220px"><canvas id="c3"></canvas></div></div>
  <div class="card"><b>Rehab max weight (kg)</b><div style="height:220px"><canvas id="c4"></canvas></div></div>
  <div class="lbl">DATA</div><div class="card mu">Saved on this device only. Export regularly as a backup (includes your exercises, templates and machine photos).<button class="w" id="exJ">⬇️ Export JSON</button><button class="w" id="exC">⬇️ Export CSV</button><button class="w" id="imJ">⬆️ Import JSON</button><button class="w" id="imWbtn">⬆️ Import weight CSV</button><button class="w" id="awHelp">🔄 Automatic weights</button><input type="file" id="imF" accept=".json,application/json" class="hid"><button class="w d" id="rst">↺ Reset to default program</button></div>
- <div class="lbl">SETTINGS</div><div class="card"><div class="rowb"><b>🍎 Food goals</b><span class="mu">${fGoals().kcal} kcal · P${fGoals().p} F${fGoals().f} C${fGoals().c} Fi${fGoals().fib??30}</span></div><button class="w" id="fGoalsP">Set calorie &amp; macro goals</button></div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="sayC" ${sayOn?"checked":""} style="width:24px;min-height:24px"> Say a phrase at 10 seconds left</label><input id="sayT" value="${esc(sayTxt)}" placeholder="Get ready fatty" aria-label="Phrase" style="margin-top:6px;font-size:16px"><button class="w" id="sayTest">🗣 Test phrase</button><div style="margin-top:14px"><b>Audio cues</b><div class="mu">Use your own recording or an audio file at each point. Default keeps the built-in sound. Clips are saved on this phone and work offline.</div><div id="cueBox">${cueRowsHTML()}</div></div><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="autoF" ${LS.get("gym.autoFin",true)?"checked":""} style="width:24px;min-height:24px"> Auto-finish a workout after 30 min with no activity</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div style="margin-top:12px"><b>Lock-screen notification</b><div class="mu" id="pushSt" style="margin:4px 0"></div><button class="w" id="pushBtn"></button></div><div style="margin-top:12px"><b>When a buzzer plays over music</b><div class="seg" id="amSeg" style="margin-top:8px">${[["mix","Play over"],["duck","Pause & resume (beta)"],["loud","Loud"]].map(([k,n])=>`<button data-am="${k}" class="${audMode===k?"on":""}">${n}</button>`).join("")}</div><div class="mu">Play over (default): buzz mixes on top of your music. Pause &amp; resume (beta, iOS 17+): song pauses for the buzz and may carry on; if you hear no buzz or the song stays paused, go back to Play over. Both follow the silent switch and only sound while the app is open, so turn on the lock-screen notification for alerts in other apps. Loud: ignores the silent switch but stops your music.</div></div><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
+ <div class="lbl">SETTINGS</div><div class="card"><div class="rowb"><b>🍎 Food goals</b><span class="mu">${fGoals().kcal} kcal · P${fGoals().p} F${fGoals().f} C${fGoals().c} Fi${fGoals().fib??30}</span></div><button class="w" id="fGoalsP">Set calorie &amp; macro goals</button></div><div class="card"><b>Rest-end sound</b><div class="seg" id="sndSeg" style="margin-top:8px">${[["buzz","Buzz"],["beep","Beep"],["off","Off"]].map(([k,n])=>`<button data-snd="${k}" class="${restSound===k?"on":""}">${n}</button>`).join("")}</div><button class="w" id="sndTest">🔊 Test sound</button><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="sayC" ${sayOn?"checked":""} style="width:24px;min-height:24px"> Say a phrase at 10 seconds left</label><input id="sayT" value="${esc(sayTxt)}" placeholder="Get ready fatty" aria-label="Phrase" style="margin-top:6px;font-size:16px"><button class="w" id="sayTest">🗣 Test phrase</button><div style="margin-top:14px"><b>Timer sounds</b><div class="mu">Upload or record clips for each cue. One is picked at random when that cue fires. With none, the built-in sound plays. Clips stay on this phone and work offline.</div><div id="cueBox">${cueRowsHTML()}</div></div><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="askC" ${LS.get("gym.askCoach",true)?"checked":""} style="width:24px;min-height:24px"> Ask to send to Coach after each workout</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="autoF" ${LS.get("gym.autoFin",true)?"checked":""} style="width:24px;min-height:24px"> Auto-finish a workout after 30 min with no activity</label><label style="display:flex;gap:10px;align-items:center;margin-top:12px"><input type="checkbox" id="phT" ${phoneT?"checked":""} style="width:24px;min-height:24px"> Phone timer alert (iPhone Shortcut “Gym Rest” starts a Clock timer when rest starts)</label><button class="w" id="phHelp">How to set up the phone timer</button><div style="margin-top:12px"><b>Lock-screen notification</b><div class="mu" id="pushSt" style="margin:4px 0"></div><button class="w" id="pushBtn"></button></div><div style="margin-top:12px"><b>When a buzzer plays over music</b><div class="seg" id="amSeg" style="margin-top:8px">${[["mix","Play over"],["duck","Pause & resume (beta)"],["loud","Loud"]].map(([k,n])=>`<button data-am="${k}" class="${audMode===k?"on":""}">${n}</button>`).join("")}</div><div class="mu">Play over (default): buzz mixes on top of your music. Pause &amp; resume (beta, iOS 17+): song pauses for the buzz and may carry on; if you hear no buzz or the song stays paused, go back to Play over. Both follow the silent switch and only sound while the app is open, so turn on the lock-screen notification for alerts in other apps. Loud: ignores the silent switch but stops your music.</div></div><div class="mu" style="margin-top:8px">iPhone: Safari can't vibrate, so Buzz plays a loud buzz sound instead. Keep the volume up; it plays even with the silent switch on.</div></div>
  <div class="lbl">CHANGE PIN</div><div class="card"><div class="mu">The PIN is a privacy lock only, not strong security.</div><input type="password" inputmode="numeric" id="pOld" placeholder="Current PIN" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew" placeholder="New 4-digit PIN" maxlength="4" style="margin-top:8px"><input type="password" inputmode="numeric" id="pNew2" placeholder="Repeat new PIN" maxlength="4" style="margin-top:8px"><button class="p w" id="pSave">Change PIN</button><button class="w" id="lockNow">🔒 Lock now</button></div>
  <div class="lbl">ABOUT</div><div class="card mu">Arwin's Gym Log · 183 cm · start ${START_WEIGHT} kg · 12-week plan from Mon 26 Oct 2026. Keep weights moderate; stop on sharp pain in the arm or knee.<div class="rowb" style="margin-top:10px;align-items:center"><span>Build ${APP_BUILD}</span><button type="button" class="sm" id="chkUpd">Check for update</button></div><div style="margin-top:6px">If this build doesn't change after an update, open Gym Log in Safari, pull to refresh, then add it to the Home Screen again.</div></div>`;
  chart("c0",{type:"bar",data:{labels,datasets:[{label:"Workouts",data:wk.map(w=>inW(w).length),backgroundColor:"#2f8cff"}]}});
