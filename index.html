@@ -195,7 +195,7 @@ label.cup input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden
 // PIN is stored only as SHA-256 hash. Privacy lock only - not real security.
 const DEFAULT_PIN_HASH="1d27ca12704e713bb23a54ae2f77a3850bb74d34afd943fd2483a57a05d725cb";
 const START=new Date(2026,9,26);const WEEKS=12;const START_WEIGHT=105.3;
-const APP_BUILD="2026.11.17.1";
+const APP_BUILD="2026.11.22.1";
 const E=(name,sets,reps,o={})=>Object.assign({name,sets,reps},o);
 const PROGRAM={
 1:{name:"Chest",group:"Chest",ex:[E("Chest Press Machine",3,"10"),E("Incline DB Press",3,"10"),E("Pec Deck/Cable Fly",3,"12"),E("Arm Rehab Band Tricep Pushdown",2,"15",{rehab:1}),E("Arm Rehab Wrist Curl (1-2kg)",2,"15",{rehab:1})]},
@@ -529,7 +529,7 @@ function renderActive(){const a=active;if(!a)return;const m=$("#aw");m.classList
  m.innerHTML=h;
  exOrdSet({root:m,scroller:m,get:()=>active&&active.ex,commit:()=>{saveActive();renderActive()}});
  $("#awMin").onclick=()=>{m.classList.add("hid");show(view)};
- $("#awFin").onclick=finishWorkout;
+ $("#awFin").onclick=()=>finishWorkout(false);
  $("#awCancel").onclick=()=>{if(confirm(a.id?"Discard changes?":"Cancel this workout? Nothing will be saved.")){active=null;saveActive();restEnd=0;m.classList.add("hid");show(view)}};
  $("#awName").oninput=e=>{a.name=e.target.value;saveActive()};$("#awDate").onchange=e=>{a.date=e.target.value||a.date;saveActive()};
  $("#ap").oninput=e=>{a.armPain=+e.target.value;$("#apv").textContent=e.target.value;saveActive()};
@@ -726,7 +726,32 @@ function finishWorkout(auto){const a=active;
  const old=a.id?sessions.find(s=>s.id===a.id):null;
  const s={id:a.id||uid(),date:a.date,dow:parse(a.date).getDay(),day:a.name,group:a.group,week:weekOf(a.date),ex,armPain:a.armPain,kneePain:a.kneePain,notes:a.notes,saved:new Date().toISOString(),dur:old?old.dur:Math.max(0,(auto?(a.lastAct||a.start):Date.now())-a.start)};
  if(old)sessions=sessions.map(x=>x.id===s.id?s:x);else sessions.push(s);
- save();playCue("wFinish");active=null;saveActive();restEnd=0;$("#aw").classList.add("hid");toast(auto?"Workout auto-finished after 30 min idle":old?"Saved ✓":"Workout complete 💪");show("history");if(LS.get("gym.askCoach",true))askCoach(s)}
+ save();playCue("wFinish");active=null;saveActive();restEnd=0;$("#aw").classList.add("hid");toast(auto?"Workout auto-finished after 30 min idle":old?"Saved ✓":"Workout complete 💪");show("history");const coach=()=>{if(LS.get("gym.askCoach",true))askCoach(s)};if(auto||old)coach();else tplPrompt(a,coach)}
+
+// ---- After finishing: update the template / save as new template (Strong-style) ----
+function tplItemFrom(e){const n=e.sets.length||1,tm=isTimed(e.exId),rs=e.sets.map(x=>x.r).filter(r=>r!==""&&r!=null&&!isNaN(+r)).map(Number);
+ const reps=e.target||(rs.length?(tm?fmtS(Math.max(...rs)):String(Math.max(...rs))):(tm?"":"10"));return{exId:e.exId,sets:n,reps,...(e.rest!=null&&e.rest!==""?{rest:+e.rest}:{})}}
+function tplDiff(a,t){const pool=t.items.map(i=>({...i})),used=new Set(),items=[],added=[],sets=[];
+ a.ex.filter(e=>exById(e.exId)).forEach(e=>{const k=pool.findIndex((i,ix)=>!used.has(ix)&&i.exId===e.exId);
+  if(k>=0){used.add(k);const o=pool[k],n=e.sets.length||1;if((+o.sets||1)!==n)sets.push(`${exName(e.exId)} ${+o.sets||1}→${n}`);items.push({...o,sets:n})}
+  else{added.push(exName(e.exId));items.push(tplItemFrom(e))}});
+ const removed=pool.filter((i,ix)=>!used.has(ix)&&exById(i.exId)).map(i=>exName(i.exId));
+ const keptOrder=pool.filter((i,ix)=>used.has(ix)).map(i=>i.exId).join("|"),newOrder=items.filter(i=>t.items.some(o=>o.exId===i.exId)).map(i=>i.exId).join("|");
+ return{items:items.concat(pool.filter((i,ix)=>!used.has(ix)&&!exById(i.exId))),added,removed,sets,order:keptOrder!==newOrder}}
+function tplPrompt(a,done){done=done||(()=>{});const t=a.tplId&&tpl.find(x=>x.id===a.tplId),ex=a.ex.filter(e=>exById(e.exId));
+ if(!ex.length)return done();
+ const mkNew=nm=>{const nt={id:"t"+uid(),name:(nm||"").trim()||a.name||"My workout",dow:"",group:a.group||"Other",note:"",items:t?tplDiff(a,t).items.filter(i=>exById(i.exId)):ex.map(tplItemFrom)};tpl.push(nt);saveLib();toast("Template “"+nt.name+"” saved ✓")};
+ let sh;const fin=()=>{if(sh)sh.remove();done()};
+ if(t){const d=tplDiff(a,t);if(!d.added.length&&!d.removed.length&&!d.sets.length&&!d.order)return done();
+  const L=[d.added.length?`<li>➕ Added: <b>${esc(d.added.join(", "))}</b></li>`:"",d.removed.length?`<li>➖ Removed: ${esc(d.removed.join(", "))}</li>`:"",d.sets.length?`<li>🔢 Sets: ${esc(d.sets.join(", "))}</li>`:"",d.order?"<li>↕️ Exercise order changed</li>":""].join("");
+  const nn=a.name&&a.name!==t.name?a.name:t.name+" (new)";
+  sh=openSheet("Update template?",`<div class="mu" style="margin-bottom:8px">You changed this workout from your <b>${esc(t.name)}</b> template. Your sets are already saved in History.</div><ul id="tpD" style="margin:0 0 14px;padding-left:20px;line-height:1.6">${L}</ul>
+  <button class="p w" id="tpU">Update “${esc(t.name)}” template</button><label style="margin-top:14px">New template name<input id="tpN" value="${esc(nn)}" maxlength="60"></label><button class="ghost w" id="tpS">Save as new template</button><button class="ghost w" id="tpK">Keep original</button>`);
+  sh.querySelector("#tpU").onclick=()=>{t.items=d.items;saveLib();toast("Template “"+t.name+"” updated ✓");fin()}}
+ else{sh=openSheet("Save as template?",`<div class="mu" style="margin-bottom:8px">Your sets are saved in History. Save these exercises as a template so you can start this workout again in one tap.</div><ul style="margin:0 0 14px;padding-left:20px;line-height:1.6">${ex.map(e=>`<li>${esc(exName(e.exId))} · ${e.sets.length||1} sets</li>`).join("")}</ul>
+  <label>Template name<input id="tpN" value="${esc(a.name&&a.name!=="Workout"?a.name:"My workout")}" maxlength="60"></label><button class="p w" id="tpS">Save as new template</button><button class="ghost w" id="tpK">Not now</button>`)}
+ sh.querySelector("#tpS").onclick=()=>{mkNew(sh.querySelector("#tpN").value);fin()};
+ sh.querySelector("#tpK").onclick=fin;sh.querySelector("[data-close]").onclick=fin}
 
 // ---- Send to Coach ----
 const COACH="arwin-gym@mail.grokbot.com";
