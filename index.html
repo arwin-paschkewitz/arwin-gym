@@ -195,7 +195,7 @@ label.cup input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden
 // PIN is stored only as SHA-256 hash. Privacy lock only - not real security.
 const DEFAULT_PIN_HASH="1d27ca12704e713bb23a54ae2f77a3850bb74d34afd943fd2483a57a05d725cb";
 const START=new Date(2026,9,26);const WEEKS=12;const START_WEIGHT=105.3;
-const APP_BUILD="2026.11.22.1";
+const APP_BUILD="2026.11.22.2";
 const E=(name,sets,reps,o={})=>Object.assign({name,sets,reps},o);
 const PROGRAM={
 1:{name:"Chest",group:"Chest",ex:[E("Chest Press Machine",3,"10"),E("Incline DB Press",3,"10"),E("Pec Deck/Cable Fly",3,"12"),E("Arm Rehab Band Tricep Pushdown",2,"15",{rehab:1}),E("Arm Rehab Wrist Curl (1-2kg)",2,"15",{rehab:1})]},
@@ -570,7 +570,7 @@ let restAt=null,restTot=1,actx=null;
 const exRest=e=>e.rest!=null?+e.rest:restDur;
 const restOf=(e,s)=>s&&s.rest!=null?+s.rest:exRest(e);
 function startRest(i,j){if(restSound==="buzz")vibNote();const e=active.ex[i],v=restOf(e,e.sets[j]);if(!v){restEnd=0;restAt=null;return}restSaid=false;if(restSound!=="off")playTones("start");restTot=v*1000;restEnd=Date.now()+restTot;restAt=[i,j];pushSync();if(phoneT)phoneTimer(v)}
-function unlockAudio(){try{primeAudio()}catch(e){}try{if(actx&&actx.state==="closed")actx=null;actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state!=="running"){actx._u=0;const p=actx.resume();if(pendSound&&p&&p.then)p.then(()=>{if(pendSound&&actx.state==="running"&&Date.now()-restOverTs<120000){pendSound=false;const k=pendKind;pendKind=null;k?playTones(k):beep()}},()=>{})}if(!actx._u){actx._u=1;const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}}catch(e){}}
+function unlockAudio(ev){try{primeAudio()}catch(e){}try{cuePrime()}catch(e){}if(ev&&ev.type&&pendCue&&Date.now()-restOverTs<120000){const c=pendCue;pendCue=null;pendSound=false;setTimeout(()=>playCue(c),0)}else if(pendCue&&Date.now()-restOverTs>=120000)pendCue=null;try{if(actx&&actx.state==="closed")actx=null;actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state!=="running"){actx._u=0;const p=actx.resume();if(pendSound&&p&&p.then)p.then(()=>{if(pendSound&&actx.state==="running"&&Date.now()-restOverTs<120000){pendSound=false;const k=pendKind;pendKind=null;k?playTones(k):beep()}},()=>{})}if(!actx._u){actx._u=1;const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}}catch(e){}}
 let restSound=LS.get("gym.sound","buzz"),pendSound=false,pendKind=null,restOverTs=0;
 /* Alert sound via <audio> (media playback ignores the iPhone silent switch); Web Audio is the fallback */
 function wavURL(kind){const sr=22050,beeps=kind==="start"?[[1046,.12]]:kind==="beep"?[[880,.22],[880,.22],[880,.22]]:[[180,.42],[180,.42],[180,.42]],gap=kind==="beep"?.16:.2,n=Math.ceil(sr*(beeps.reduce((a,b)=>a+b[1]+gap,0)+.05)),d=new Int16Array(n);let p=0;
@@ -599,9 +599,9 @@ function playTones(kind){if(audMode!=="loud"){duckFor(kind==="start"?500:kind===
 /* robust: set session first, then resume (recreate if interrupted/closed); fall back to a short <audio> clip */
 function newCtx(){try{if(actx&&actx.close)actx.close()}catch(e){}actx=new(window.AudioContext||window.webkitAudioContext)();return actx}
 function htmlClip(kind){try{const a=audEl(kind);a.muted=false;a.currentTime=0;const p=a.play();if(p&&p.catch)p.catch(()=>{})}catch(e){}}
-async function safePlay(kind){try{if(!actx||actx.state==="closed"||actx.state==="interrupted")newCtx();
+async function safePlay(kind){try{if(!actx||actx.state==="closed")newCtx();
  const res=()=>Promise.race([actx.resume().then(()=>actx.state==="running",()=>false),new Promise(r=>setTimeout(()=>r(false),350))]);
- let ok=actx.state==="running"||await res();if(!ok){newCtx();ok=await res()}
+ let ok=actx.state==="running"||await res();
  if(ok){playWA(kind);return}}catch(e){}htmlClip(kind)}
 function playWA(kind){unlockAudio();if(!actx)return;const go=()=>{try{const t0=actx.currentTime+.03,m=actx.createDynamicsCompressor?actx.createDynamicsCompressor():null,out=m||actx.destination;if(m){/* limiter: catches peaks from the 1.5x gains without squashing quiet parts */m.threshold.value=-2;m.knee.value=0;m.ratio.value=20;m.attack.value=.001;m.release.value=.08;m.connect(actx.destination)}
  if(kind==="start"){const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=1046;g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(.53,t0+.01);g.gain.exponentialRampToValueAtTime(.0001,t0+.12);o.connect(g).connect(out);o.start(t0);o.stop(t0+.13);return}
@@ -633,34 +633,53 @@ async function cueDelSound(id){const d=await cueDB();return new Promise(ok=>{con
 async function cueAll(cue){const d=await cueDB();return new Promise(ok=>{const q=d.transaction("sounds").objectStore("sounds").index("cue").getAll(cue);q.onsuccess=()=>ok((q.result||[]).sort((a,b)=>(a.ts||0)-(b.ts||0)));q.onerror=()=>ok([])})}
 function decodeBuf(ab){return new Promise((ok,no)=>{try{const c=actx||newCtx(),p=c.decodeAudioData(ab,ok,no);if(p&&p.then)p.then(ok,no)}catch(e){no(e)}})}
 function cueForget(id){for(const k of Object.keys(cueSounds)){const s=(cueSounds[k]||[]).find(x=>x.id===id);if(s&&s.url){try{URL.revokeObjectURL(s.url)}catch(e){}}cueSounds[k]=(cueSounds[k]||[]).filter(x=>x.id!==id)}}
-async function cueLoadRec(rec){if(!rec||!rec.blob||!rec.cue)return null;const slot={id:rec.id,cue:rec.cue,name:rec.name||"Clip",type:rec.type||rec.blob.type||"",ts:rec.ts||0,buf:null,url:URL.createObjectURL(rec.blob)};
- try{if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();slot.buf=await decodeBuf(await rec.blob.arrayBuffer())}catch(e){}
+/* iPhone: File blobs from the picker can't be stored (or go unreadable) in IndexedDB, so clips are kept as raw bytes + a sniffed MIME type */
+function cueSniff(ab,fb){try{const u=new Uint8Array(ab.slice(0,12)),t=String.fromCharCode(...u);
+ if(t.startsWith("caff"))return"audio/x-caf";if(t.slice(4,8)==="ftyp")return"audio/mp4";if(t.startsWith("RIFF"))return"audio/wav";if(t.startsWith("OggS"))return"audio/ogg";
+ if(t.startsWith("ID3")||(u[0]===255&&(u[1]&224)===224))return(u[1]&6)===0?"audio/aac":"audio/mpeg";if(u[0]===26&&u[1]===69&&u[2]===223&&u[3]===163)return"audio/webm";if(t.startsWith("fLaC"))return"audio/flac"}catch(e){}
+ const m=String(fb||"").toLowerCase();return m==="audio/x-m4a"||m==="audio/m4a"?"audio/mp4":m}
+async function cueBytes(rec){if(rec.data instanceof ArrayBuffer)return rec.data;if(rec.data&&rec.data.buffer)return rec.data.buffer;if(rec.blob)return await rec.blob.arrayBuffer();return null}
+async function cueLoadRec(rec){if(!rec||!rec.cue||!(rec.data||rec.blob))return null;let ab=null;try{ab=await cueBytes(rec)}catch(e){}
+ const type=ab?cueSniff(ab,rec.type||(rec.blob&&rec.blob.type)):(rec.type||"");
+ const slot={id:rec.id,cue:rec.cue,name:rec.name||"Clip",type,ts:rec.ts||0,buf:null,url:ab?URL.createObjectURL(new Blob([ab],{type})):"",err:ab?null:"unreadable"};
+ if(ab&&!rec.data){try{await cuePutSound({id:rec.id,cue:rec.cue,data:ab.slice(0),type,name:rec.name||"Clip",ts:rec.ts||Date.now()})}catch(e){}}
+ if(ab)try{if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();slot.buf=await decodeBuf(ab.slice(0))}catch(e){}
+ if(ab&&!slot.buf)slot.el=cueEl(slot);
  const list=(cueSounds[rec.cue]||[]).filter(x=>x.id!==rec.id);list.push(slot);list.sort((a,b)=>(a.ts||0)-(b.ts||0));cueSounds[rec.cue]=list;return slot}
 async function cueLoadCue(cue){(cueSounds[cue]||[]).forEach(s=>{if(s.url)try{URL.revokeObjectURL(s.url)}catch(e){}});cueSounds[cue]=[];
  const rows=await cueAll(cue);for(const rec of rows)await cueLoadRec(rec);return cueSounds[cue]}
 function cueOn(id){return (cueSounds[id]||[]).some(s=>s.buf||s.url)}
-function cuePick(id,list){list=list||(cueSounds[id]||[]).filter(s=>s.buf||s.url);if(!list.length)return null;
+function cueEl(slot){try{const a=new Audio();a.preload="auto";a.setAttribute("playsinline","");a.src=slot.url;return a}catch(e){return null}}
+/* first tap: prime <audio> fallbacks for clips Web Audio couldn't decode so they may play later outside a tap (iOS) */
+function cuePrime(){for(const k of Object.keys(cueSounds))for(const sl of cueSounds[k]||[]){if(sl.buf||!sl.el||sl.primed)continue;sl.primed=1;try{const a=sl.el;a.muted=true;const p=a.play();if(p&&p.then)p.then(()=>{a.pause();a.currentTime=0;a.muted=false},()=>{a.muted=false;sl.primed=0})}catch(e){sl.primed=0}}}
+let pendCue=null;
+function cuePick(id,list){list=list||(cueSounds[id]||[]).filter(s=>s.buf||(s.url&&!s.err));if(!list.length)return null;
  let pool=list;if(list.length>1&&cueLast[id]){const f=list.filter(s=>s.id!==cueLast[id]);if(f.length)pool=f}
  const pick=pool[Math.floor(Math.random()*pool.length)];cueLast[id]=pick.id;return pick}
 /* plays a random custom clip if any are loaded; returns false so the caller plays its default. Pass fixed to preview one clip. */
-function playCue(id,fixed){if(restSound==="off")return false;const pick=fixed||cuePick(id);if(!pick)return false;
+function playCue(id,fixed,onres){if(restSound==="off")return false;const pick=fixed||cuePick(id);if(!pick)return false;onres=onres||(()=>{});
  const b=pick.buf,dur=b?b.duration*1000:3000;
  if(audMode==="loud")setSession();else duckFor(dur+400);
- const viaEl=()=>{try{if(!pick.url)throw 0;const a=new Audio(pick.url);a.setAttribute("playsinline","");a.volume=1;const p=a.play();if(p&&p.catch)p.catch(()=>{if(fixed)return;const d={ready10:()=>{cueMode._skip=1;sayReady();delete cueMode._skip},restEnd:()=>playTones(restSound==="beep"?"beep":"buzz")}[id];d&&d()})}catch(e){if(!fixed){const d={ready10:()=>{cueMode._skip=1;sayReady();delete cueMode._skip},restEnd:()=>playTones(restSound==="beep"?"beep":"buzz")}[id];d&&d()}}};
+ const dflt=()=>{if(fixed)return;const d={ready10:()=>{cueMode._skip=1;sayReady();delete cueMode._skip},restEnd:()=>playTones(restSound==="beep"?"beep":"buzz"),wStart:()=>{},wFinish:()=>{},cd321:()=>{}}[id];d&&d()};
+ /* couldn't sound now (iOS locked the audio outside a tap): play this clip on the next tap instead of failing silently */
+ const later=()=>{if(!fixed&&TIMER_CUES.includes(id)){pendSound=true;pendKind=null;pendCue=id}onres(false,"queued");dflt()};
+ const viaEl=()=>{try{const a=pick.el||(pick.url?new Audio(pick.url):null);if(!a)throw 0;a.setAttribute("playsinline","");a.muted=false;a.volume=1;try{a.currentTime=0}catch(_){}const p=a.play();if(p&&p.then)p.then(()=>onres(true,"audio"),later);else onres(true,"audio")}catch(e){later()}};
  if(!b)return viaEl(),true;
- (async()=>{try{if(!actx||actx.state==="closed"||actx.state==="interrupted")newCtx();if(actx.state!=="running")await Promise.race([actx.resume(),new Promise(r=>setTimeout(r,350))]);
+ (async()=>{try{if(!actx||actx.state==="closed")newCtx();
+  /* never swap an unlocked-but-interrupted context for a fresh one outside a tap: the fresh one starts locked on iPhone */
+  if(actx.state!=="running")await Promise.race([actx.resume().catch(()=>{}),new Promise(r=>setTimeout(r,350))]);
   if(actx.state!=="running")return viaEl();
   const t0=actx.currentTime+.03,src=actx.createBufferSource(),g=actx.createGain(),m=actx.createDynamicsCompressor?actx.createDynamicsCompressor():null;src.buffer=b;g.gain.value=1.5;
   if(m){m.threshold.value=-2;m.knee.value=0;m.ratio.value=20;m.attack.value=.001;m.release.value=.08;src.connect(g).connect(m).connect(actx.destination)}else src.connect(g).connect(actx.destination);
-  src.onended=()=>{if(audMode==="duck")duckFor(300)};src.start(t0)}catch(e){viaEl()}})();return true}
+  src.onended=()=>{if(audMode==="duck")duckFor(300)};src.start(t0);onres(true,"webaudio")}catch(e){viaEl()}})();return true}
 async function cueInit(){try{await Promise.all(CUES.map(([id])=>cueLoadCue(id)));const box=document.querySelector("#cueBox");if(box){box.innerHTML=cueRowsHTML();bindCues(document)}}catch(e){}}
 setTimeout(cueInit,0);
 function recMime(){const t=["audio/mp4","audio/mp4;codecs=mp4a.40.2","audio/aac","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return "";return t.find(x=>MediaRecorder.isTypeSupported(x))||""}
 const CUE_ACCEPT="audio/*,.m4a,.mp3,.wav,.aac,.caf,.ogg,.webm,.mpeg,.mp4";
-function clipRowHTML(s){return `<div class="tclip" data-sid="${esc(s.id)}"><div class="tclipn">${esc(s.name||"Clip")}</div><div class="tclipr"><button type="button" class="cplay">▶ Play</button><button type="button" class="cdel d">🗑 Delete</button></div></div>`}
+function clipRowHTML(s){return `<div class="tclip" data-sid="${esc(s.id)}"><div class="tclipn">${esc(s.name||"Clip")}${s.err?'<div class="mu" style="color:#ff9f0a">⚠️ This clip can\'t be read any more. Delete it and upload it again.</div>':!s.buf?'<div class="mu">Plays through the phone\'s media player (no volume boost).</div>':""}</div><div class="tclipr"><button type="button" class="cplay">▶ Play</button><button type="button" class="cdel d">🗑 Delete</button></div></div>`}
 function cueBlockHTML(id,lab,def){const list=cueSounds[id]||[];
  return `<div class="tsub" data-cue="${id}"><b>${lab}</b><div class="mu" style="margin:4px 0">${list.length?list.length+" clip"+(list.length>1?"s":"")+" — one plays at random":"No clips yet — default: "+def}</div>
- <div class="clist">${list.map(clipRowHTML).join("")}</div>
+ <div class="clist">${list.map(clipRowHTML).join("")}</div>${TIMER_CUES.includes(id)?`<button type="button" class="w ctest">🔔 Test as timer (plays in 3 s)</button>`:""}
  <label class="cup">📁 Upload clips<input type="file" accept="${CUE_ACCEPT}" multiple class="cfile"></label>
  <button type="button" class="w crec">🎙 Record a clip</button></div>`}
 function cueRowsHTML(){const main=CUES.filter(([id])=>TIMER_CUES.includes(id)),other=CUES.filter(([id])=>!TIMER_CUES.includes(id));
@@ -672,10 +691,15 @@ function bindCues(root){const box=root.querySelector("#cueBox");if(!box)return;c
   r.querySelectorAll(".tclip").forEach(row=>{const sid=row.dataset.sid,slot=(cueSounds[id]||[]).find(s=>s.id===sid);
    const pl=row.querySelector(".cplay");if(pl)pl.onclick=()=>{unlockAudio();if(!slot)return toast("No clip to play");const o=restSound;if(o==="off")restSound="buzz";if(!playCue(id,slot))toast("Couldn't play this clip");restSound=o};
    const dl=row.querySelector(".cdel");if(dl)dl.onclick=async()=>{if(!confirm("Delete this clip?"))return;await cueDelSound(sid);cueForget(sid);toast("Clip deleted");redraw()}});
+  const tb=r.querySelector(".ctest");if(tb)tb.onclick=()=>{unlockAudio();unlockSpeech();const o=restSound;if(o==="off"){toast("Timer sound is Off — turn on Buzz or Beep first");return}tb.disabled=true;tb.textContent="⏳ Wait 3 s…";
+   setTimeout(()=>{tb.disabled=false;tb.textContent="🔔 Test as timer (plays in 3 s)";const done=(ok,how)=>toast(ok?"🔊 Played like a real timer. No sound? Check the silent switch and volume.":"🔇 iPhone blocked it — tap the screen once and it plays. Keep the app open while resting.",3500);
+    if(!playCue(id,null,done)){if(id==="restEnd")beep();else{cueMode._skip=1;sayReady();delete cueMode._skip}toast("No clips — played the built-in sound")}},3000)};
   const fi=r.querySelector(".cfile");
   if(fi)fi.onchange=async()=>{const files=[...fi.files||[]];fi.value="";if(!files.length)return;let n=0;
    for(const f of files){if(f.size>5e6&&!confirm((f.name||"That file")+" is over 5 MB. Short clips work best. Use it anyway?"))continue;
-    const rec={id:cueNewId(),cue:id,blob:f,type:f.type||"",name:f.name||"Clip",ts:Date.now()};await cuePutSound(rec);const slot=await cueLoadRec(rec);n++;if(!slot||!slot.buf)toast((f.name||"Clip")+" saved, but this format may not play on this phone")}
+    try{const ab=await f.arrayBuffer(),type=cueSniff(ab,f.type);const rec={id:cueNewId(),cue:id,data:ab,type,name:f.name||"Clip",ts:Date.now()};await cuePutSound(rec);const slot=await cueLoadRec(rec);n++;
+     if(slot&&!slot.buf){const ok=await new Promise(res=>{const a=new Audio();a.onloadedmetadata=()=>res(true);a.onerror=()=>res(false);a.src=slot.url;setTimeout(()=>res(false),3000)});if(!ok)toast((f.name||"Clip")+" saved, but this phone can't play that format. Use m4a, mp3 or wav.",4000)}}
+    catch(e){toast("Couldn't save "+(f.name||"that clip")+". Try a shorter m4a or mp3.",4000)}}
    if(n)toast(n>1?n+" clips saved ✓":"Clip saved ✓");redraw()};
   const rb=r.querySelector(".crec"),st=r.querySelector(".mu");
   if(rb)rb.onclick=async()=>{
@@ -687,7 +711,7 @@ function bindCues(root){const box=root.querySelector("#cueBox");if(!box)return;c
    mr.onstop=async()=>{clearTimeout(to);stream.getTracks().forEach(t=>t.stop());cueRec=null;setSession();if(!chunks.length){toast("Nothing recorded");return redraw()}
     const blob=new Blob(chunks,{type:mr.mimeType||mt||"audio/mp4"}),n=new Date(),pad=x=>String(x).padStart(2,"0"),
      name="Recording "+n.getDate()+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][n.getMonth()]+" "+pad(n.getHours())+":"+pad(n.getMinutes());
-    const rec={id:cueNewId(),cue:id,blob,type:blob.type,name,ts:Date.now()};await cuePutSound(rec);await cueLoadRec(rec);toast("Recording saved ✓");redraw()};
+    try{const ab=await blob.arrayBuffer(),type=cueSniff(ab,blob.type);await cuePutSound({id:cueNewId(),cue:id,data:ab,type,name,ts:Date.now()}).then(r=>r);const all=await cueAll(id);await cueLoadRec(all[all.length-1]);toast("Recording saved ✓")}catch(e){toast("Couldn't save the recording")}redraw()};
    mr.start();rb.textContent="⏹ Stop (max 10 s)";rb.className="w d crec";if(st)st.textContent="Recording…";to=setTimeout(()=>{if(mr.state==="recording")mr.stop()},10000)}})}
 function beep(){if(restSound==="off")return;playTones(restSound==="beep"?"beep":"buzz")}
 /* Phone timer alert: runs the user's "Gym Rest" iOS Shortcut, which starts a Clock timer (rings in background / on lock screen) */
@@ -707,7 +731,7 @@ function restDone(){restAt=null;restOverTs=Date.now();if(navigator.vibrate)navig
 initExReorder();
 document.addEventListener("pointerdown",unlockAudio,{capture:true,passive:true});document.addEventListener("touchend",unlockAudio,{capture:true,passive:true});
 document.addEventListener("visibilitychange",()=>{if(document.hidden)return;unlockAudio();tickFn();/* end time is a timestamp, so this fires at once on return */
- if(pendSound){pendSound=false;if(!(Date.now()-restOverTs<120000&&playCue("restEnd")))beep()}});
+ if(pendSound){pendSound=false;const c=pendCue||"restEnd";pendCue=null;if(!(Date.now()-restOverTs<120000&&playCue(c)))beep()}});
 setInterval(()=>{if(actx&&actx.state==="suspended"&&restEnd&&!document.hidden)actx.resume().catch(()=>{})},2000);
 function restPicker(i,j){const e=active.ex[i],s0=e.sets[j];let v=restOf(e,s0);
  const sh=openSheet("Rest timer · "+exName(e.exId)+" set "+(j+1),`<div class="rpv" id="rpv"></div><div class="row"><button class="ghost" id="rpm">−15s</button><button class="ghost" id="rpp">+15s</button></div>
